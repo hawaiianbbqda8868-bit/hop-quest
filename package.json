@@ -1,0 +1,9 @@
+{
+  "name": "hop-quest",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hop Quest — original run-and-jump platformer with a customizable hero.",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

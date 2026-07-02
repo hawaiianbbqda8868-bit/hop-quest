@@ -99,7 +99,7 @@
 </div>
 
 <script>
-const APP_VERSION='v1';
+const APP_VERSION='v2';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -452,7 +452,7 @@ function loop(ts){ let dt=Math.min(0.033,(ts-last)/1000)||0; last=ts;
   render(); drawHUD();
   requestAnimationFrame(loop);
 }
-buildLevel(); buildMenu();
+buildLevel(); resetPlayer(); buildMenu();   // resetPlayer() creates cam/p so the first render frame doesn't crash
 document.getElementById('ver').textContent=APP_VERSION;
 requestAnimationFrame(loop);
 if('serviceWorker' in navigator && location.protocol.startsWith('http')){ addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
