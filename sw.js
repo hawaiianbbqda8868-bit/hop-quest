@@ -1,5 +1,5 @@
 // Network-first app shell so updates land when online; cache = offline fallback.
-const CACHE = 'hop-v2';
+const CACHE = 'hop-v3';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {

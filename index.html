@@ -74,6 +74,10 @@
   <div class="sub">Build your hero · pick your powers · run &amp; jump!</div>
 
   <div class="card">
+    <div class="lbl">Level — pick where to start</div>
+    <div class="row" id="levels"></div>
+  </div>
+  <div class="card">
     <div class="lbl">Color</div>
     <div class="row" id="colors"></div>
   </div>
@@ -94,12 +98,13 @@
 <div class="overlay hidden" id="overScreen">
   <div class="big" id="resultText">LEVEL CLEAR!</div>
   <div class="sub" id="resultSub"></div>
-  <button class="play" id="againBtn">PLAY AGAIN ▶</button>
+  <button class="play" id="nextBtn">NEXT LEVEL ▶</button>
+  <button class="chip" id="againBtn" style="margin-top:12px">↺ Replay level</button>
   <button class="chip" id="overMenu" style="margin-top:12px">← Menu / change hero</button>
 </div>
 
 <script>
-const APP_VERSION='v2';
+const APP_VERSION='v3';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -118,35 +123,97 @@ const ABILITIES=[
 ];
 const BUDGET=3;
 let sel={ color:COLORS[3], hat:'cap', abil:new Set(['double']) };
-try{ const s=JSON.parse(localStorage.getItem('hopHero')||'null'); if(s){ sel.color=s.color||sel.color; sel.hat=s.hat||sel.hat; sel.abil=new Set(s.abil||['double']); } }catch(e){}
-function saveHero(){ try{ localStorage.setItem('hopHero', JSON.stringify({color:sel.color,hat:sel.hat,abil:[...sel.abil]})); }catch(e){} }
+let menuLevel=0;
+try{ const s=JSON.parse(localStorage.getItem('hopHero')||'null'); if(s){ sel.color=s.color||sel.color; sel.hat=s.hat||sel.hat; sel.abil=new Set(s.abil||['double']); if(typeof s.level==='number') menuLevel=s.level; } }catch(e){}
+function saveHero(){ try{ localStorage.setItem('hopHero', JSON.stringify({color:sel.color,hat:sel.hat,abil:[...sel.abil],level:menuLevel})); }catch(e){} }
 function has(a){ return sel.abil.has(a); }
 
-// ---------- level ----------
-// solid tiles built from data; coins/enemies/spikes/flag as entities
-let W, H, grid, coins, enemies, spikes, flag, startPx;
-function buildLevel(){
-  H=13;
-  const ground=[];               // per-column top-most ground row (or -1 for pit)
-  const pits=[[24,26],[43,45],[70,72],[95,97]];
-  W=124;
-  grid=Array.from({length:H},()=>new Array(W).fill(0));
-  const isPit=x=>pits.some(([a,b])=>x>=a&&x<=b);
-  for(let x=0;x<W;x++){ if(!isPit(x)){ for(let y=H-3;y<H;y++) grid[y][x]=1; } }
-  // border floor sentinels handled by solidAt (out of bounds sides are walls)
-  const plat=(x,y,w)=>{ for(let i=0;i<w;i++) if(x+i<W) grid[y][x+i]=2; };
-  plat(8,7,4); plat(15,5,3); plat(30,8,4); plat(34,5,5); plat(48,7,6); plat(58,4,3);
-  plat(64,8,4); plat(78,6,5); plat(88,8,3); plat(100,6,4); plat(108,4,4); plat(114,8,4);
-  coins=[]; const coin=(x,y,n=1,dir=1)=>{ for(let i=0;i<n;i++) coins.push({x:(x+i*dir)*TILE+TILE/2, y:y*TILE+TILE/2, got:false}); };
-  coin(9,6,3); coin(15,4,3); coin(20,9,3); coin(35,4,4); coin(49,6,5); coin(58,3,3);
-  coin(65,7,3); coin(79,5,4); coin(90,9,3); coin(101,5,3); coin(108,3,4); coin(115,7,3);
-  coin(40,9,3); coin(52,9,4);
-  enemies=[]; const en=(x,y)=>enemies.push({x:x*TILE, y:y*TILE-2, w:30,h:30, vx:60, vy:0, dir:-1, alive:true, stun:0});
-  [12,20,33,50,51,66,80,90,102,110].forEach(x=>en(x,H-3-1));
-  spikes=[]; const spk=(x,w)=>{ for(let i=0;i<w;i++) spikes.push({x:(x+i)*TILE, y:(H-3)*TILE}); };
-  spk(38,2); spk(62,2); spk(85,2);
-  flag={ x:(W-4)*TILE, y:(H-3)*TILE - TILE*6, top:(H-3)*TILE - TILE*6, h:TILE*6 };
-  startPx={ x:2*TILE, y:(H-3)*TILE-40 };
+// ---------- levels ----------
+// 5 hand-built worlds, each with its own layout AND art theme.
+let W, H, grid, coins, enemies, spikes, flag, startPx, curTheme, curName, curLevel=0;
+
+const LEVELS=[
+  { name:'Sunny Meadow', W:124,
+    theme:{ sky:['#7ec8ff','#cfeaff'], hillA:'#a9d98a', hillB:'#8fc96f', dirt:'#7a4a24', cap:'#5cbf46', platA:'#c98a3a', platB:'#8a5a22', spike:'#c9d0da' },
+    build(L){
+      L.ground([[24,26],[43,45],[70,72],[95,97]]);
+      L.plat(8,7,4); L.plat(15,5,3); L.plat(30,8,4); L.plat(34,5,5); L.plat(48,7,6); L.plat(58,4,3);
+      L.plat(64,8,4); L.plat(78,6,5); L.plat(88,8,3); L.plat(100,6,4); L.plat(108,4,4); L.plat(114,8,4);
+      L.coin(9,6,3); L.coin(15,4,3); L.coin(20,9,3); L.coin(35,4,4); L.coin(49,6,5); L.coin(58,3,3);
+      L.coin(65,7,3); L.coin(79,5,4); L.coin(90,9,3); L.coin(101,5,3); L.coin(108,3,4); L.coin(115,7,3);
+      L.coin(40,9,3); L.coin(52,9,4);
+      [12,20,33,50,66,80,102,110].forEach(x=>L.en(x));
+      L.spk(38,2); L.spk(62,2); L.spk(85,2);
+    } },
+  { name:'Crystal Cavern', W:118,
+    theme:{ sky:['#241a3a','#3a2c55'], hillA:'#2e2450', hillB:'#241b40', dirt:'#4a4358', cap:'#8f7fc0', platA:'#7a6aa0', platB:'#4a4066', spike:'#b8c4e0' },
+    build(L){
+      L.ground([[28,29],[52,53],[78,79]]);
+      L.ceiling();
+      L.plat(9,8,3); L.plat(15,6,3); L.plat(21,8,3); L.plat(27,7,2); L.plat(34,5,4); L.plat(42,7,3);
+      L.plat(48,5,3); L.plat(54,7,2); L.plat(60,8,3); L.plat(66,6,4); L.plat(74,7,2); L.plat(80,8,3);
+      L.plat(86,6,4); L.plat(94,5,3); L.plat(100,7,3); L.plat(106,5,4);
+      L.coin(10,7,3); L.coin(16,5,3); L.coin(35,4,4); L.coin(48,4,3); L.coin(67,5,3); L.coin(87,5,3);
+      L.coin(95,4,3); L.coin(107,4,3); L.coin(22,7,3); L.coin(61,7,3);
+      [12,20,38,46,64,72,90,98,108].forEach(x=>L.en(x));
+      L.spk(44,2); L.spk(70,2);
+    } },
+  { name:'Sky Islands', W:116, cloudy:true,
+    theme:{ sky:['#bfe6ff','#e9f6ff'], hillA:null, hillB:null, dirt:'#7a4a24', cap:'#5cbf46', platA:'#c98a3a', platB:'#8a5a22', spike:'#c9d0da' },
+    startX:2, startTop:10, flagX:110, flagTop:9,
+    build(L){
+      const isl=[[1,10,4],[7,9,3],[12,9,3],[17,8,3],[22,9,3],[27,8,3],[32,9,3],[37,8,3],[42,9,3],[47,8,3],
+        [52,9,3],[57,8,3],[62,9,3],[67,8,3],[72,9,3],[77,8,3],[82,9,3],[87,8,3],[92,9,3],[97,8,3],[102,9,4],[108,9,4]];
+      isl.forEach(([x,y,w])=>L.island(x,y,w));
+      [[9,8],[19,7],[29,7],[39,7],[49,7],[59,7],[69,7],[79,7],[89,7],[99,7]].forEach(([x,y])=>L.coin(x,y,3));
+      L.coin(35,4,3); L.coin(65,4,3); L.coin(95,4,3);      // high-reward (double-jump)
+      L.en(22,8); L.en(42,8); L.en(62,8); L.en(82,8);
+    } },
+  { name:'Lava Ruins', W:120,
+    theme:{ sky:['#3a1414','#6e2a1a'], hillA:'#3a1e14', hillB:'#2a1410', dirt:'#3a2a2a', cap:'#5a3a2a', platA:'#7a4a2a', platB:'#4a2a1a', spike:'#e0b0a0', hazard:'#ff5a1e' },
+    build(L){
+      L.ground([[19,21],[35,37],[51,53],[67,69],[83,85],[99,101],[113,115]]);
+      L.plat(24,6,3); L.plat(40,5,3); L.plat(56,6,3); L.plat(72,5,3); L.plat(88,6,3); L.plat(104,5,3);
+      L.coin(24,5,3); L.coin(40,4,3); L.coin(56,5,3); L.coin(72,4,3); L.coin(88,5,3); L.coin(104,4,3);
+      L.coin(8,9,4); L.coin(46,9,3); L.coin(78,9,3);
+      [10,30,46,62,78,94,110].forEach(x=>L.en(x));
+      L.spk(27,2); L.spk(43,2); L.spk(59,3); L.spk(75,2); L.spk(91,3); L.spk(107,2);
+    } },
+  { name:'Frost Peaks', W:132,
+    theme:{ sky:['#cfe8ff','#ffffff'], hillA:'#dbeeff', hillB:'#c3e0f5', dirt:'#a9c6e0', cap:'#ffffff', platA:'#bcdcf0', platB:'#8fb6d6', spike:'#dff0ff' },
+    build(L){
+      L.ground([[28,30],[60,62],[95,97]]);
+      L.plat(10,8,4); L.plat(18,6,4); L.plat(26,8,3); L.plat(34,7,4); L.plat(42,5,4); L.plat(50,7,4);
+      L.plat(58,8,3); L.plat(66,6,4); L.plat(74,4,4); L.plat(82,6,4); L.plat(90,8,3); L.plat(100,6,4);
+      L.plat(108,4,4); L.plat(116,6,4); L.plat(124,8,4);
+      L.coin(18,5,4); L.coin(42,4,4); L.coin(66,5,4); L.coin(74,3,4); L.coin(100,5,4); L.coin(108,3,4);
+      L.coin(11,7,3); L.coin(50,6,3); L.coin(82,5,3); L.coin(124,7,3);
+      [14,38,54,72,88,104,120].forEach(x=>L.en(x));
+      L.spk(46,2); L.spk(78,2); L.spk(112,2);
+    } },
+];
+
+function buildLevel(idx){
+  curLevel=((idx%LEVELS.length)+LEVELS.length)%LEVELS.length;
+  const def=LEVELS[curLevel]; curTheme=def.theme; curName=def.name;
+  H=13; W=def.W; grid=Array.from({length:H},()=>new Array(W).fill(0));
+  coins=[]; enemies=[]; spikes=[];
+  const GT=H-3;                    // ground-top row
+  const api={
+    ground(pits){ const isPit=x=>pits&&pits.some(([a,b])=>x>=a&&x<=b);
+      for(let x=0;x<W;x++) if(!isPit(x)) for(let y=GT;y<H;y++) grid[y][x]=1; },
+    island(x,y,w,h=1){ for(let j=0;j<h;j++) for(let i=0;i<w;i++) if(x+i<W&&y+j<H) grid[y+j][x+i]=1; },
+    plat(x,y,w){ for(let i=0;i<w;i++) if(x+i<W) grid[y][x+i]=2; },
+    ceiling(){ for(let x=0;x<W;x++) grid[0][x]=1; },
+    coin(x,y,n=1,dir=1){ for(let i=0;i<n;i++) coins.push({x:(x+i*dir)*TILE+TILE/2, y:y*TILE+TILE/2, got:false}); },
+    en(x,y=GT-1){ enemies.push({x:x*TILE, y:y*TILE-2, w:30,h:30, vx:60, vy:0, dir:-1, alive:true, stun:0}); },
+    spk(x,w,y=GT){ for(let i=0;i<w;i++) spikes.push({x:(x+i)*TILE, y:y*TILE}); },
+  };
+  def.build(api);
+  const fx=def.flagX!=null?def.flagX:(W-4), ft=def.flagTop!=null?def.flagTop:GT;
+  flag={ x:fx*TILE, top:ft*TILE - TILE*6, h:TILE*6 };
+  const sx=def.startX!=null?def.startX:2, st=def.startTop!=null?def.startTop:GT;
+  startPx={ x:sx*TILE, y:st*TILE-40 };
 }
 function solidAt(tx,ty){
   if(tx<0||tx>=W) return true;      // level walls
@@ -163,7 +230,7 @@ function resetPlayer(){
   maxHearts=3+(has('heart')?1:0); hearts=maxHearts; coinsGot=0;
   cam={x:0,y:0};
 }
-function startGame(){ saveHero(); buildLevel(); resetPlayer(); state='play'; winFlash=0; deathTimer=0; hideOverlays(); }
+function startGame(idx){ if(idx==null) idx=menuLevel; menuLevel=((idx%LEVELS.length)+LEVELS.length)%LEVELS.length; saveHero(); buildLevel(menuLevel); resetPlayer(); state='play'; winFlash=0; deathTimer=0; hideOverlays(); }
 
 // ---------- input ----------
 const keys={left:false,right:false,jump:false,jumpEdge:false,act:false,actEdge:false};
@@ -309,17 +376,20 @@ function sfx(k){ if(k==='coin'){beep(880,.06,'square',.05); setTimeout(()=>beep(
 // ---------- render ----------
 function render(){
   // sky gradient
-  const sky=ctx.createLinearGradient(0,0,0,VH); sky.addColorStop(0,'#7ec8ff'); sky.addColorStop(1,'#cfeaff');
+  const T=curTheme;
+  const sky=ctx.createLinearGradient(0,0,0,VH); sky.addColorStop(0,T.sky[0]); sky.addColorStop(1,T.sky[1]);
   ctx.fillStyle=sky; ctx.fillRect(0,0,VW,VH);
-  // parallax hills
-  ctx.save();
-  const hx=-cam.x*0.3;
-  ctx.fillStyle='#a9d98a';
-  for(let i=-1;i<8;i++){ const bx=hx%600+i*600; ctx.beginPath(); ctx.ellipse(bx+300,VH-70,260,150,0,Math.PI,2*Math.PI); ctx.fill(); }
-  ctx.fillStyle='#8fc96f';
-  const hx2=-cam.x*0.5;
-  for(let i=-1;i<10;i++){ const bx=hx2%420+i*420; ctx.beginPath(); ctx.ellipse(bx+200,VH-40,180,120,0,Math.PI,2*Math.PI); ctx.fill(); }
-  ctx.restore();
+  // parallax hills (skipped on themes without hills, e.g. Sky Islands)
+  if(T.hillA){
+    ctx.save();
+    const hx=-cam.x*0.3;
+    ctx.fillStyle=T.hillA;
+    for(let i=-1;i<8;i++){ const bx=hx%600+i*600; ctx.beginPath(); ctx.ellipse(bx+300,VH-70,260,150,0,Math.PI,2*Math.PI); ctx.fill(); }
+    ctx.fillStyle=T.hillB;
+    const hx2=-cam.x*0.5;
+    for(let i=-1;i<10;i++){ const bx=hx2%420+i*420; ctx.beginPath(); ctx.ellipse(bx+200,VH-40,180,120,0,Math.PI,2*Math.PI); ctx.fill(); }
+    ctx.restore();
+  }
   // clouds
   ctx.fillStyle='rgba(255,255,255,.85)';
   for(let i=0;i<6;i++){ const cxp=((i*260 - cam.x*0.2)%(W*TILE))+40, cyp=60+((i*53)%120); cloud(cxp,cyp); }
@@ -327,22 +397,29 @@ function render(){
   const sh=poundShake>0?Math.sin(performance.now()/20)*4:0;
   ctx.save(); ctx.translate(-Math.round(cam.x), -Math.round(cam.y)+sh);
 
+  // hazard band (lava) shows through pits; ground tiles drawn on top cover the rest
+  if(T.hazard){
+    const ly=(H-2)*TILE + Math.sin(performance.now()/300)*3;
+    ctx.fillStyle=T.hazard; ctx.fillRect(0,ly,W*TILE,2*TILE);
+    ctx.fillStyle='rgba(255,220,120,.5)'; ctx.fillRect(0,ly,W*TILE,5);
+  }
+
   // tiles
   const tx0=Math.floor(cam.x/TILE), tx1=Math.ceil((cam.x+VW)/TILE);
   for(let ty=0;ty<H;ty++) for(let tx=tx0;tx<=tx1;tx++){ const v=grid[ty]&&grid[ty][tx]; if(!v) continue;
     const px=tx*TILE, py=ty*TILE;
     if(v===1){ // ground
-      ctx.fillStyle='#7a4a24'; ctx.fillRect(px,py,TILE,TILE);
-      ctx.fillStyle='#5cbf46'; if(ty===0||grid[ty-1][tx]===0) ctx.fillRect(px,py,TILE,10);
+      ctx.fillStyle=T.dirt; ctx.fillRect(px,py,TILE,TILE);
+      ctx.fillStyle=T.cap; if(ty>0 && grid[ty-1][tx]===0) ctx.fillRect(px,py,TILE,10);
       ctx.fillStyle='rgba(0,0,0,.12)'; ctx.fillRect(px,py+TILE-4,TILE,4);
       ctx.fillStyle='rgba(255,255,255,.06)'; ctx.fillRect(px+3,py+12,4,4); ctx.fillRect(px+22,py+20,4,4);
     } else { // platform
-      ctx.fillStyle='#c98a3a'; roundRect(px+1,py+1,TILE-2,TILE-8,4); ctx.fill();
-      ctx.fillStyle='#8a5a22'; ctx.fillRect(px+1,py+TILE-10,TILE-2,4);
+      ctx.fillStyle=T.platA; roundRect(px+1,py+1,TILE-2,TILE-8,4); ctx.fill();
+      ctx.fillStyle=T.platB; ctx.fillRect(px+1,py+TILE-10,TILE-2,4);
     }
   }
   // spikes
-  ctx.fillStyle='#c9d0da';
+  ctx.fillStyle=T.spike;
   for(const s of spikes){ for(let k=0;k<3;k++){ const bx=s.x+k*13+3; ctx.beginPath(); ctx.moveTo(bx,s.y+TILE); ctx.lineTo(bx+6,s.y+TILE-16); ctx.lineTo(bx+12,s.y+TILE); ctx.closePath(); ctx.fill(); } }
   // coins
   for(const c of coins){ if(c.got) continue; const s=1+Math.sin(performance.now()/200+c.x)*0.12;
@@ -408,18 +485,30 @@ function drawHUD(){
   const el=document.getElementById('hud');
   if(state==='start'){ el.innerHTML=''; return; }
   let h=''; for(let i=0;i<maxHearts;i++) h+= i<hearts?'❤️':'🤍';
-  el.innerHTML='<span>'+h+'</span><span>🪙 '+coinsGot+'/'+coins.length+'</span>';
+  el.innerHTML='<span>'+h+'</span><span>🪙 '+coinsGot+'/'+coins.length+'</span><span style="color:#cfe6ff">🗺️ '+(curLevel+1)+'· '+curName+'</span>';
 }
 
 // ---------- overlays / UI ----------
 function hideOverlays(){ document.getElementById('startScreen').classList.add('hidden'); document.getElementById('overScreen').classList.add('hidden'); }
-function toMenu(){ state='start'; document.getElementById('overScreen').classList.add('hidden'); document.getElementById('startScreen').classList.remove('hidden'); }
-function win(){ sfx('win'); const o=document.getElementById('overScreen'); document.getElementById('resultText').textContent='LEVEL CLEAR! 🏁'; document.getElementById('resultText').className='big win';
-  document.getElementById('resultSub').textContent='You collected '+coinsGot+' / '+coins.length+' coins with '+hearts+' ❤️ to spare!'; o.classList.remove('hidden'); }
-function lose(){ const o=document.getElementById('overScreen'); document.getElementById('resultText').textContent='OUCH! 💥'; document.getElementById('resultText').className='big lose';
-  document.getElementById('resultSub').textContent='You collected '+coinsGot+' coins. Try a different power loadout!'; o.classList.remove('hidden'); }
+function toMenu(){ state='start'; document.getElementById('overScreen').classList.add('hidden'); document.getElementById('startScreen').classList.remove('hidden'); buildMenu(); }
+function win(){ sfx('win'); const o=document.getElementById('overScreen'), rt=document.getElementById('resultText');
+  const last=curLevel>=LEVELS.length-1; rt.className='big win';
+  rt.textContent=last?'QUEST COMPLETE! 🎉':'LEVEL CLEAR! 🏁';
+  document.getElementById('resultSub').textContent = last
+    ? ('You beat all '+LEVELS.length+' worlds — '+coinsGot+'/'+coins.length+' coins on the last one!')
+    : ('Nice! '+coinsGot+' / '+coins.length+' coins, '+hearts+' ❤️ left. Up next: '+LEVELS[curLevel+1].name+'!');
+  document.getElementById('nextBtn').style.display=last?'none':'';
+  o.classList.remove('hidden'); }
+function lose(){ const o=document.getElementById('overScreen'), rt=document.getElementById('resultText'); rt.textContent='OUCH! 💥'; rt.className='big lose';
+  document.getElementById('resultSub').textContent='You collected '+coinsGot+' coins. Try again or a different power loadout!';
+  document.getElementById('nextBtn').style.display='none';
+  o.classList.remove('hidden'); }
 
 function buildMenu(){
+  if(menuLevel>=LEVELS.length||menuLevel<0) menuLevel=0;
+  const lw=document.getElementById('levels'); lw.innerHTML='';
+  LEVELS.forEach((lv,i)=>{ const d=document.createElement('div'); d.className='chip'+(i===menuLevel?' sel':''); d.textContent=(i+1)+'· '+lv.name;
+    d.onclick=()=>{ menuLevel=i; [...lw.children].forEach(x=>x.classList.remove('sel')); d.classList.add('sel'); saveHero(); }; lw.appendChild(d); });
   const cw=document.getElementById('colors'); cw.innerHTML='';
   COLORS.forEach(c=>{ const d=document.createElement('div'); d.className='sw'+(c===sel.color?' sel':''); d.style.background=c;
     d.onclick=()=>{ sel.color=c; [...cw.children].forEach(x=>x.classList.toggle('sel',x===d)); saveHero(); }; cw.appendChild(d); });
@@ -439,8 +528,9 @@ function refreshAbil(){
   document.querySelectorAll('.abil').forEach(d=>{ const id=d.dataset.id; const on=sel.abil.has(id);
     d.classList.toggle('sel',on); d.classList.toggle('dis', !on && sel.abil.size>=BUDGET); });
 }
-document.getElementById('playBtn').onclick=startGame;
-document.getElementById('againBtn').onclick=startGame;
+document.getElementById('playBtn').onclick=()=>startGame(menuLevel);
+document.getElementById('nextBtn').onclick=()=>startGame(curLevel+1);
+document.getElementById('againBtn').onclick=()=>startGame(curLevel);
 document.getElementById('overMenu').onclick=toMenu;
 document.getElementById('menuBtn').onclick=toMenu;
 
@@ -452,7 +542,7 @@ function loop(ts){ let dt=Math.min(0.033,(ts-last)/1000)||0; last=ts;
   render(); drawHUD();
   requestAnimationFrame(loop);
 }
-buildLevel(); resetPlayer(); buildMenu();   // resetPlayer() creates cam/p so the first render frame doesn't crash
+buildLevel(menuLevel); resetPlayer(); buildMenu();   // resetPlayer() creates cam/p so the first render frame doesn't crash
 document.getElementById('ver').textContent=APP_VERSION;
 requestAnimationFrame(loop);
 if('serviceWorker' in navigator && location.protocol.startsWith('http')){ addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
