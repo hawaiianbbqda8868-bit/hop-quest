@@ -106,7 +106,7 @@
 </div>
 
 <script>
-const APP_VERSION='v4';
+const APP_VERSION='v5';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -345,7 +345,7 @@ function update(dt){
     if(Math.abs((pl.x+pl.w/2)-c.x)<22 && Math.abs((pl.y+pl.h/2)-c.y)<24){ c.got=true; coinsGot++; sfx('coin'); }
   }
   // spikes
-  for(const s of spikes){ if(pl.hurt<=0 && pl.x+pl.w-6>s.x && pl.x+6<s.x+TILE && pl.y+pl.h>s.y+10 && pl.y+pl.h<s.y+TILE+8){ hitPlayer(); } }
+  for(const s of spikes){ if(pl.hurt<=0 && pl.x+pl.w-6>s.x && pl.x+6<s.x+TILE && pl.y+pl.h>s.y-13 && pl.y<s.y){ hitPlayer(); } }
   // flag / goal
   if(pl.x+pl.w>flag.x && pl.y+pl.h>flag.top){ state='over'; winFlash=1; win(); }
   // camera
@@ -420,9 +420,10 @@ function render(){
       ctx.fillStyle=T.platB; ctx.fillRect(px+1,py+TILE-10,TILE-2,4);
     }
   }
-  // spikes
+  // spikes — sit ON the ground surface (s.y), tips pointing up
   ctx.fillStyle=T.spike;
-  for(const s of spikes){ for(let k=0;k<3;k++){ const bx=s.x+k*13+3; ctx.beginPath(); ctx.moveTo(bx,s.y+TILE); ctx.lineTo(bx+6,s.y+TILE-16); ctx.lineTo(bx+12,s.y+TILE); ctx.closePath(); ctx.fill(); } }
+  for(const s of spikes){ for(let k=0;k<3;k++){ const bx=s.x+k*13+3; ctx.beginPath(); ctx.moveTo(bx,s.y); ctx.lineTo(bx+6,s.y-17); ctx.lineTo(bx+12,s.y); ctx.closePath(); ctx.fill(); }
+    ctx.fillStyle='rgba(0,0,0,.12)'; ctx.fillRect(s.x+2,s.y-2,TILE-4,3); ctx.fillStyle=T.spike; }
   // coins
   for(const c of coins){ if(c.got) continue; const s=1+Math.sin(performance.now()/200+c.x)*0.12;
     ctx.fillStyle='#ffd54a'; ctx.beginPath(); ctx.ellipse(c.x,c.y,10*s,12,0,0,7); ctx.fill();
