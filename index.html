@@ -116,7 +116,7 @@
 </div>
 
 <script>
-const APP_VERSION='v10';
+const APP_VERSION='v11';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -142,7 +142,7 @@ function has(a){ return sel.abil.has(a); }
 
 // ---------- levels ----------
 // 5 hand-built worlds, each with its own layout AND art theme.
-let W, H, grid, coins, enemies, spikes, projectiles, boxes, presents, toasts, flag, startPx, curTheme, curName, curLevel=0;
+let W, H, grid, coins, enemies, spikes, projectiles, boxes, presents, toasts, boss, flag, startPx, curTheme, curName, curLevel=0;
 
 const LEVELS=[
   { name:'Sunny Meadow', W:190, music:'cheery',
@@ -348,7 +348,7 @@ const LEVELS=[
       L.fly(70,-1); L.fly(86,-1);
       L.box(27,6); L.box(107,6); L.box(187,6);
     } },
-  { name:'Rainbow Summit', W:215, music:'finale',
+  { name:'Rainbow Summit', W:215, music:'finale', bossFight:true,
     theme:{ sky:['#ff9ec8','#ffe0a0'], hillA:'#b0e0ff', hillB:'#ffc0e0', dirt:'#a06ac0', cap:'#ffd54a', platA:'#7ad0ff', platB:'#c86ad0', spike:'#ffffff' },
     build(L){
       L.ground([[22,24],[44,46],[66,68],[88,90],[110,112],[132,134],[154,156],[176,178],[198,200]]);
@@ -396,6 +396,11 @@ function buildLevel(idx){
     box(x,y){ boxes.push({x:x*TILE+4, y:(y+SKY)*TILE+4, w:32, h:36, open:false}); },
   };
   def.build(api);
+  boss=null;
+  if(def.bossFight){
+    boss={ x:(W-8)*TILE, y:(GT+SKY)*TILE-66, w:76, h:66, hp:6, maxHp:6, active:false, alive:true,
+           vx:0, vy:0, onGround:false, hopT:1.2, shotT:3, inv:0, face:-1 };
+  }
   const fx=def.flagX!=null?def.flagX:(W-4), ft=(def.flagTop!=null?def.flagTop:GT)+SKY;
   flag={ x:fx*TILE, top:ft*TILE - TILE*6, h:TILE*6 };
   const sx=def.startX!=null?def.startX:2, st=(def.startTop!=null?def.startTop:GT)+SKY;
@@ -568,11 +573,38 @@ function update(dt){
     pr.life-=dt; pr.x+=pr.vx*dt; pr.y+=pr.vy*dt;
     if(pr.life<=0 || solidAt(Math.floor(pr.x/TILE),Math.floor(pr.y/TILE))){ pr.dead=true; continue; }
     if(pr.friendly){
+      if(boss&&boss.alive&&boss.active&&boss.inv<=0 && pr.x>boss.x-6 && pr.x<boss.x+boss.w+6 && pr.y>boss.y-6 && pr.y<boss.y+boss.h+6){
+        pr.dead=true; bossHit(); continue; }
       for(const en of enemies){ if(en.alive && pr.x>en.x-6 && pr.x<en.x+en.w+6 && pr.y>en.y-6 && pr.y<en.y+en.h+6){
         en.alive=false; pr.dead=true; addPop(en.x+en.w/2,en.y); sfx('stomp'); break; } }
       continue;
     }
     if(pl.hurt<=0 && pl.x+pl.w-4>pr.x-6 && pl.x+4<pr.x+6 && pl.y+pl.h-4>pr.y-6 && pl.y+4<pr.y+6){ pr.dead=true; hitPlayer(); }
+  }
+  // boss fight — awakens when you cross into the arena
+  if(boss&&boss.alive){
+    const b=boss;
+    if(!b.active && pl.x>(W-14)*TILE){ b.active=true; setTrack('boss'); }
+    if(b.active){
+      if(b.inv>0) b.inv-=dt;
+      b.hopT-=dt; b.shotT-=dt;
+      b.vy+=G*dt; b.vy=Math.min(b.vy,MAXFALL);
+      if(b.onGround && b.hopT<=0){ b.vy=-620; b.hopT=1.25; b.vx=(pl.x>b.x?1:-1)*140; }
+      else if(b.onGround) b.vx*=0.82;
+      b.face=pl.x>b.x?1:-1;
+      moveX(b,b.vx*dt); b.onGround=moveY(b,b.vy*dt);
+      b.x=Math.max((W-14)*TILE, Math.min(b.x,(W-2)*TILE-b.w));
+      if(b.shotT<=0){ b.shotT=3.2; sfx('shoot');
+        const cx0=b.x+b.w/2, cy0=b.y+22, dx=(pl.x+pl.w/2)-cx0, dy=(pl.y+pl.h/2)-cy0, d=Math.hypot(dx,dy)||1;
+        [-0.3,0,0.3].forEach(a=>{ const ca=Math.cos(a),sa=Math.sin(a);
+          projectiles.push({x:cx0, y:cy0, vx:(dx/d*ca-dy/d*sa)*230, vy:(dx/d*sa+dy/d*ca)*230, life:4}); });
+      }
+      if(pl.hurt<=0 && b.inv<=0 && rectHit(pl,b)){
+        if((pl.vy>0 && (pl.y+pl.h)-b.y<24) || pl.pounding){ bossHit(); pl.vy=-540; }
+        else if(pl.big){ bossHit(); pl.vx=-pl.face*300; pl.vy=-260; }
+        else hitPlayer();
+      }
+    }
   }
   // present boxes — stomp (or pound) the lid to pop them open
   for(const bx of boxes){ if(bx.open) continue;
@@ -601,8 +633,8 @@ function update(dt){
   }
   // spikes
   for(const s of spikes){ if(pl.hurt<=0 && pl.x+pl.w-6>s.x && pl.x+6<s.x+TILE && pl.y+pl.h>s.y-13 && pl.y<s.y){ hitPlayer(); } }
-  // flag / goal
-  if(pl.x+pl.w>flag.x && pl.y+pl.h>flag.top){ state='over'; winFlash=1; win(); }
+  // flag / goal (locked while the boss guards it)
+  if(!(boss&&boss.alive) && pl.x+pl.w>flag.x && pl.y+pl.h>flag.top){ state='over'; winFlash=1; win(); }
   // camera
   cam.x=Math.max(0,Math.min(pl.x+pl.w/2-VW/2, W*TILE-VW));
   cam.y=Math.max(-40,Math.min(pl.y+p.h/2-VH/2, H*TILE-VH));
@@ -610,6 +642,15 @@ function update(dt){
 }
 let poundShake=0;
 function rectHit(a,b){ return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y; }
+function bossHit(){ const b=boss; if(!b||!b.alive) return;
+  b.hp--; b.inv=0.9; addPop(b.x+b.w/2,b.y+10); sfx('bosshit');
+  if(b.hp<=0){ b.alive=false; sfx('bossdie');
+    for(let k=0;k<5;k++) addPop(b.x+Math.random()*b.w, b.y+Math.random()*b.h);
+    for(let k=0;k<12;k++){ const an=k/12*Math.PI*2;   // celebratory coin ring
+      coins.push({x:b.x+b.w/2+Math.cos(an)*70, y:b.y+20+Math.sin(an)*45, got:false}); }
+    setTrack(LEVELS[curLevel].music||'finale');
+  }
+}
 function hitPlayer(){ if(p.hurt>0) return;
   if(p.shieldT>0){ p.hurt=0.4; sfx('shield'); return; }   // shield soaks the hit
   if(p.big||p.wantBig){ p.wantBig=false; p.hurt=1.1; p.vy=-320; p.vx=-p.face*260; sfx('hurt'); return; }  // lose your size, not a heart
@@ -639,7 +680,9 @@ function sfx(k){ if(k==='coin'){beep(880,.06,'square',.05); setTimeout(()=>beep(
   else if(k==='box'){beep(520,.07,'square',.05); setTimeout(()=>beep(780,.09,'square',.05),60);}
   else if(k==='power'){[660,880,1180].forEach((f,i)=>setTimeout(()=>beep(f,.09,'square',.05),i*70));}
   else if(k==='star'){beep(980,.05,'square',.04);}
-  else if(k==='shield'){beep(300,.08,'triangle',.06);} }
+  else if(k==='shield'){beep(300,.08,'triangle',.06);}
+  else if(k==='bosshit'){beep(160,.15,'sawtooth',.08); setTimeout(()=>beep(120,.12,'sawtooth',.06),80);}
+  else if(k==='bossdie'){[520,392,330,262,392,523,660,784].forEach((f,i)=>setTimeout(()=>beep(f,.14,'square',.06),i*110));} }
 
 // ---------- music ----------
 // Tiny chiptune step-sequencer: each track is a 32-step loop (16th notes) of MIDI
@@ -669,6 +712,10 @@ const TRACKS={
     lead:[62,_,_,_,65,_,62,_,_,_,69,_,68,_,65,_,62,_,_,_,70,_,69,_,65,_,68,_,62,_,_,_],
     bass:[38,_,38,_,38,_,38,_,38,_,38,_,41,_,43,_,38,_,38,_,38,_,38,_,46,_,45,_,43,_,41,_],
     perc:[2,_,1,_,2,_,1,_,2,_,1,_,2,_,1,_,2,_,1,_,2,_,1,_,2,_,1,1,2,_,1,1]},
+  boss:{bpm:150, lw:'square', lv:.03, bv:.06,
+    lead:[62,_,62,_,65,_,62,_,68,_,65,_,62,_,70,_,69,_,65,_,68,_,64,_,62,_,65,_,62,_,_,_],
+    bass:[38,38,_,38,38,_,38,_,41,41,_,41,41,_,41,_,36,36,_,36,36,_,36,_,43,_,41,_,38,_,_,_],
+    perc:[2,_,1,1,2,_,1,_,2,_,1,1,2,_,1,_,2,_,1,1,2,_,1,_,2,1,2,1,2,_,1,1]},
   finale:{bpm:144, lw:'square', lv:.03, bv:.05,
     lead:[72,_,72,_,72,_,76,_,79,_,_,_,76,_,79,_,81,_,79,_,77,_,76,_,74,_,76,_,72,_,_,_],
     bass:[48,_,55,_,48,_,55,_,41,_,48,_,41,_,48,_,43,_,50,_,43,_,50,_,48,_,55,_,48,_,55,_],
@@ -764,10 +811,13 @@ function render(){
     ctx.fillStyle='#ffd54a'; ctx.beginPath(); ctx.ellipse(c.x,c.y,10*s,12,0,0,7); ctx.fill();
     ctx.strokeStyle='#c98a00'; ctx.lineWidth=2; ctx.stroke();
     ctx.fillStyle='#fff4c2'; ctx.fillRect(c.x-2,c.y-6,3,12); }
-  // flag
-  ctx.fillStyle='#e6e6e6'; ctx.fillRect(flag.x,flag.top,5,flag.h);
-  ctx.fillStyle='#3fbf5a'; ctx.beginPath(); ctx.moveTo(flag.x+5,flag.top+6); ctx.lineTo(flag.x+40,flag.top+16); ctx.lineTo(flag.x+5,flag.top+26); ctx.closePath(); ctx.fill();
-  ctx.fillStyle='#5a3a1a'; ctx.fillRect(flag.x-6,flag.top+flag.h-6,17,6);
+  // flag (hidden while a living boss guards it)
+  if(!(boss&&boss.alive)){
+    ctx.fillStyle='#e6e6e6'; ctx.fillRect(flag.x,flag.top,5,flag.h);
+    ctx.fillStyle='#3fbf5a'; ctx.beginPath(); ctx.moveTo(flag.x+5,flag.top+6); ctx.lineTo(flag.x+40,flag.top+16); ctx.lineTo(flag.x+5,flag.top+26); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#5a3a1a'; ctx.fillRect(flag.x-6,flag.top+flag.h-6,17,6);
+  }
+  if(boss&&boss.alive) drawBoss();
   // enemies
   for(const en of enemies){ if(!en.alive) continue; drawEnemy(en); }
   // projectiles
@@ -790,6 +840,31 @@ function render(){
   for(const t of toasts){ ctx.globalAlpha=Math.max(0,t.t); ctx.fillText(t.ic,t.x,t.y); }
   ctx.globalAlpha=1;
   ctx.restore();
+  // boss HP bar (screen space)
+  if(boss&&boss.active&&boss.alive){
+    const bw2=300, x0=(VW-bw2)/2, y0=20;
+    ctx.fillStyle='rgba(0,0,0,.45)'; roundRect(x0-10,y0-14,bw2+20,40,10); ctx.fill();
+    ctx.fillStyle='#4a2a3a'; ctx.fillRect(x0,y0,bw2,9);
+    ctx.fillStyle='#ff5a8a'; ctx.fillRect(x0,y0,bw2*boss.hp/boss.maxHp,9);
+    ctx.fillStyle='#fff'; ctx.font='bold 12px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('👑 RAINBOW KING',VW/2,y0+22);
+  }
+}
+function drawBoss(){ const b=boss, bw=b.w, bh=b.h, cx=b.x+bw/2, by=b.y;
+  const wob=Math.sin(performance.now()/140)*3;
+  const flash=b.inv>0 && Math.floor(performance.now()/90)%2===0;
+  ctx.fillStyle='rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(cx,by+bh,bw*0.5,6,0,0,7); ctx.fill();
+  ctx.fillStyle=flash?'#f0c0f0':'#b05ac0';
+  ctx.beginPath(); ctx.moveTo(b.x+4,by+bh); ctx.quadraticCurveTo(b.x,by+wob,cx,by+wob);
+  ctx.quadraticCurveTo(b.x+bw,by+wob,b.x+bw-4,by+bh); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#ffd54a'; ctx.beginPath();
+  ctx.moveTo(cx-20,by+wob-2); ctx.lineTo(cx-20,by+wob-16); ctx.lineTo(cx-10,by+wob-6); ctx.lineTo(cx,by+wob-18);
+  ctx.lineTo(cx+10,by+wob-6); ctx.lineTo(cx+20,by+wob-16); ctx.lineTo(cx+20,by+wob-2); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(cx-14,by+26,9,0,7); ctx.arc(cx+14,by+26,9,0,7); ctx.fill();
+  ctx.fillStyle='#222'; const ex=b.face*3; ctx.beginPath(); ctx.arc(cx-14+ex,by+27,4,0,7); ctx.arc(cx+14+ex,by+27,4,0,7); ctx.fill();
+  ctx.strokeStyle='#5a1050'; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(cx-24,by+14); ctx.lineTo(cx-6,by+20); ctx.moveTo(cx+24,by+14); ctx.lineTo(cx+6,by+20); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,by+46,6,1.1*Math.PI,1.9*Math.PI); ctx.stroke();
 }
 function drawBox(bx){ const x=bx.x, y=bx.y, w=bx.w, h=bx.h;
   const col=['#e2506a','#4aa8e2','#8a5cd0','#3fbf5a'][((x/TILE)|0)%4];
