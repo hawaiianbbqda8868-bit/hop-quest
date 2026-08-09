@@ -116,7 +116,7 @@
 </div>
 
 <script>
-const APP_VERSION='v11';
+const APP_VERSION='v12';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -145,7 +145,7 @@ function has(a){ return sel.abil.has(a); }
 let W, H, grid, coins, enemies, spikes, projectiles, boxes, presents, toasts, boss, flag, startPx, curTheme, curName, curLevel=0;
 
 const LEVELS=[
-  { name:'Sunny Meadow', W:190, music:'cheery',
+  { name:'Sunny Meadow', W:190, music:'cheery', boss:{nm:'MEADOW BLOB', col:'#5a9c3a', hp:3, shots:0},
     theme:{ sky:['#7ec8ff','#cfeaff'], hillA:'#a9d98a', hillB:'#8fc96f', dirt:'#7a4a24', cap:'#5cbf46', platA:'#c98a3a', platB:'#8a5a22', spike:'#c9d0da' },
     build(L){
       L.ground([[24,26],[43,45],[70,72],[95,97],[120,122],[145,147],[168,170]]);
@@ -164,7 +164,7 @@ const LEVELS=[
       L.fly(50,-1); L.fly(74,-1);
       L.box(9,6); L.box(65,7); L.box(118,9); L.box(151,6);
     } },
-  { name:'Crystal Cavern', W:180, music:'cave',
+  { name:'Crystal Cavern', W:180, music:'cave', boss:{nm:'CRYSTAL GOLEM', col:'#7a6ac0', hp:3, shots:0},
     theme:{ sky:['#241a3a','#3a2c55'], hillA:'#2e2450', hillB:'#241b40', dirt:'#4a4358', cap:'#8f7fc0', platA:'#7a6aa0', platB:'#4a4066', spike:'#b8c4e0' },
     build(L){
       L.ground([[28,29],[52,53],[78,79],[104,105],[130,131],[156,157]]);
@@ -185,7 +185,7 @@ const LEVELS=[
       L.fly(50,0); L.fly(66,0);
       L.box(10,7); L.box(61,7); L.box(133,6);
     } },
-  { name:'Sky Islands', W:180, cloudy:true, music:'breezy',
+  { name:'Sky Islands', W:180, cloudy:true, music:'breezy', boss:{nm:'SKY PUFF', col:'#e08ab0', hp:3, shots:0, hop:60},
     theme:{ sky:['#bfe6ff','#e9f6ff'], hillA:null, hillB:null, dirt:'#7a4a24', cap:'#5cbf46', platA:'#c98a3a', platB:'#8a5a22', spike:'#c9d0da' },
     startX:2, startTop:10, flagX:170, flagTop:9,
     build(L){
@@ -203,7 +203,7 @@ const LEVELS=[
       L.fly(50,-1); L.fly(74,0);
       L.box(8,8); L.box(53,8); L.box(108,7);
     } },
-  { name:'Lava Ruins', W:185, music:'danger',
+  { name:'Lava Ruins', W:185, music:'danger', boss:{nm:'LAVA LORD', col:'#d04a20', hp:3, shots:1, x:182},
     theme:{ sky:['#3a1414','#6e2a1a'], hillA:'#3a1e14', hillB:'#2a1410', dirt:'#3a2a2a', cap:'#5a3a2a', platA:'#7a4a2a', platB:'#4a2a1a', spike:'#e0b0a0', hazard:'#ff5a1e' },
     build(L){
       L.ground([[19,21],[35,37],[51,53],[67,69],[83,85],[99,101],[113,115],[129,131],[145,147],[161,163],[177,179]]);
@@ -220,7 +220,7 @@ const LEVELS=[
       L.fly(60,0); L.fly(76,0);
       L.box(25,5); L.box(89,5); L.box(153,5);
     } },
-  { name:'Frost Peaks', W:200, music:'icy',
+  { name:'Frost Peaks', W:200, music:'icy', boss:{nm:'FROST GIANT', col:'#7ab8e0', hp:3, shots:1},
     theme:{ sky:['#cfe8ff','#ffffff'], hillA:'#dbeeff', hillB:'#c3e0f5', dirt:'#a9c6e0', cap:'#ffffff', platA:'#bcdcf0', platB:'#8fb6d6', spike:'#dff0ff' },
     build(L){
       L.ground([[28,30],[60,62],[95,97],[125,127],[158,160],[185,187]]);
@@ -240,7 +240,7 @@ const LEVELS=[
       L.fly(110,-1); L.fly(126,-1);
       L.box(11,7); L.box(91,7); L.box(163,5);
     } },
-  { name:'Mushroom Hollow', W:195, music:'cheery',
+  { name:'Mushroom Hollow', W:195, music:'cheery', boss:{nm:'SPORE CHIEF', col:'#c05a8a', hp:3, shots:1},
     theme:{ sky:['#6fd0a8','#c8f0dd'], hillA:'#5bbf90', hillB:'#48a578', dirt:'#6a4a34', cap:'#d85a8a', platA:'#c86a9a', platB:'#9a4a70', spike:'#d8c0ca' },
     build(L){
       L.ground([[22,24],[46,48],[72,74],[100,102],[128,130],[156,158],[180,182]]);
@@ -259,7 +259,7 @@ const LEVELS=[
       L.fly(56,-1); L.fly(72,-1);
       L.box(11,6); L.box(79,6); L.box(161,6);
     } },
-  { name:'Windy Cliffs', W:185, cloudy:true, music:'breezy',
+  { name:'Windy Cliffs', W:185, cloudy:true, music:'breezy', boss:{nm:'GALE GUARD', col:'#8aa8c0', hp:3, shots:1, hop:60},
     theme:{ sky:['#a8d8f0','#e8f6ff'], hillA:null, hillB:null, dirt:'#8a7a6a', cap:'#c0d0dc', platA:'#b0c4d4', platB:'#8098ac', spike:'#dfeef8' },
     startX:2, startTop:8, flagX:177, flagTop:8,
     build(L){
@@ -276,7 +276,7 @@ const LEVELS=[
       L.fly(50,-1); L.fly(66,0);
       L.box(2,8); L.box(80,8); L.box(164,8);
     } },
-  { name:'Clockwork Foundry', W:190, music:'cave',
+  { name:'Clockwork Foundry', W:190, music:'cave', boss:{nm:'GEAR GOLEM', col:'#707a88', hp:4, shots:1},
     theme:{ sky:['#2a2e38','#464c5a'], hillA:'#333a46', hillB:'#282e38', dirt:'#4a4e58', cap:'#8a929e', platA:'#7a828e', platB:'#4a525e', spike:'#c0c8d4' },
     build(L){
       L.ground([[26,28],[54,56],[82,84],[110,112],[138,140],[166,168]]);
@@ -293,7 +293,7 @@ const LEVELS=[
       L.fly(58,-1); L.fly(74,-1);
       L.box(13,6); L.box(93,6); L.box(177,6);
     } },
-  { name:'Poison Bog', W:190, music:'danger',
+  { name:'Poison Bog', W:190, music:'danger', boss:{nm:'BOG BEAST', col:'#6a9a3a', hp:4, shots:1},
     theme:{ sky:['#3a4a2a','#5a6a3a'], hillA:'#3a4a2a', hillB:'#2a3a1e', dirt:'#3a3a2a', cap:'#7a9a4a', platA:'#6a8a3a', platB:'#3a5a1a', spike:'#b0d060', hazard:'#7ac83a' },
     build(L){
       L.ground([[18,20],[34,36],[50,52],[66,68],[82,84],[98,100],[114,116],[130,132],[146,148],[162,164],[178,180]]);
@@ -310,7 +310,7 @@ const LEVELS=[
       L.fly(60,0); L.fly(76,0);
       L.box(25,5); L.box(89,5); L.box(169,4);
     } },
-  { name:'Storm Fortress', W:195, music:'cave',
+  { name:'Storm Fortress', W:195, music:'cave', boss:{nm:'STORM BARON', col:'#7a5ae0', hp:4, shots:1},
     theme:{ sky:['#2a2440','#4a3a66'], hillA:'#332a4e', hillB:'#241e3a', dirt:'#3a3450', cap:'#6a5a8a', platA:'#5a4a7a', platB:'#3a2e56', spike:'#c0b0e0' },
     build(L){
       L.ground([[24,26],[52,54],[80,82],[108,110],[136,138],[164,166]]);
@@ -328,7 +328,7 @@ const LEVELS=[
       L.fly(104,-1); L.fly(120,-1);
       L.box(31,7); L.box(87,6); L.box(171,6);
     } },
-  { name:'Obsidian Depths', W:200, music:'danger',
+  { name:'Obsidian Depths', W:200, music:'danger', boss:{nm:'SHADOW KING', col:'#4a3a5a', hp:4, shots:1},
     theme:{ sky:['#18141e','#2e2436'], hillA:'#221c2a', hillB:'#161020', dirt:'#2a2430', cap:'#5a3a5a', platA:'#4a3a4a', platB:'#2a1e2a', spike:'#e08090', hazard:'#ff4a3a' },
     build(L){
       L.ground([[20,22],[40,42],[60,62],[80,82],[100,102],[120,122],[140,142],[160,162],[180,182]]);
@@ -348,7 +348,7 @@ const LEVELS=[
       L.fly(70,-1); L.fly(86,-1);
       L.box(27,6); L.box(107,6); L.box(187,6);
     } },
-  { name:'Rainbow Summit', W:215, music:'finale', bossFight:true,
+  { name:'Rainbow Summit', W:215, music:'finale', boss:{nm:'RAINBOW KING', col:'#b05ac0', hp:6, shots:3},
     theme:{ sky:['#ff9ec8','#ffe0a0'], hillA:'#b0e0ff', hillB:'#ffc0e0', dirt:'#a06ac0', cap:'#ffd54a', platA:'#7ad0ff', platB:'#c86ad0', spike:'#ffffff' },
     build(L){
       L.ground([[22,24],[44,46],[66,68],[88,90],[110,112],[132,134],[154,156],[176,178],[198,200]]);
@@ -397,9 +397,12 @@ function buildLevel(idx){
   };
   def.build(api);
   boss=null;
-  if(def.bossFight){
-    boss={ x:(W-8)*TILE, y:(GT+SKY)*TILE-66, w:76, h:66, hp:6, maxHp:6, active:false, alive:true,
-           vx:0, vy:0, onGround:false, hopT:1.2, shotT:3, inv:0, face:-1 };
+  if(def.boss){
+    const cfg=def.boss, fxc=def.flagX!=null?def.flagX:(W-4), ftc=def.flagTop!=null?def.flagTop:GT;
+    const big=cfg.hp>=6, bw=big?76:60, bh=big?66:52;
+    boss={ x:(cfg.x!=null?cfg.x:fxc-2)*TILE, y:(ftc+SKY)*TILE-bh, w:bw, h:bh,
+           hp:cfg.hp, maxHp:cfg.hp, nm:cfg.nm, col:cfg.col, shots:cfg.shots, hop:cfg.hop||(big?140:110),
+           active:false, alive:true, vx:0, vy:0, onGround:false, hopT:1.2, shotT:4, inv:0, face:-1 };
   }
   const fx=def.flagX!=null?def.flagX:(W-4), ft=(def.flagTop!=null?def.flagTop:GT)+SKY;
   flag={ x:fx*TILE, top:ft*TILE - TILE*6, h:TILE*6 };
@@ -589,14 +592,15 @@ function update(dt){
       if(b.inv>0) b.inv-=dt;
       b.hopT-=dt; b.shotT-=dt;
       b.vy+=G*dt; b.vy=Math.min(b.vy,MAXFALL);
-      if(b.onGround && b.hopT<=0){ b.vy=-620; b.hopT=1.25; b.vx=(pl.x>b.x?1:-1)*140; }
+      if(b.onGround && b.hopT<=0){ b.vy=-620; b.hopT=1.25; b.vx=(pl.x>b.x?1:-1)*b.hop; }
       else if(b.onGround) b.vx*=0.82;
       b.face=pl.x>b.x?1:-1;
       moveX(b,b.vx*dt); b.onGround=moveY(b,b.vy*dt);
       b.x=Math.max((W-14)*TILE, Math.min(b.x,(W-2)*TILE-b.w));
-      if(b.shotT<=0){ b.shotT=3.2; sfx('shoot');
+      if(b.y>H*TILE+80){ b.alive=false; setTrack(LEVELS[curLevel].music||'finale'); }  // hopped into a pit — counts as a win
+      if(b.shots>0 && b.shotT<=0){ b.shotT=b.shots===3?3.2:4; sfx('shoot');
         const cx0=b.x+b.w/2, cy0=b.y+22, dx=(pl.x+pl.w/2)-cx0, dy=(pl.y+pl.h/2)-cy0, d=Math.hypot(dx,dy)||1;
-        [-0.3,0,0.3].forEach(a=>{ const ca=Math.cos(a),sa=Math.sin(a);
+        (b.shots===3?[-0.3,0,0.3]:[0]).forEach(a=>{ const ca=Math.cos(a),sa=Math.sin(a);
           projectiles.push({x:cx0, y:cy0, vx:(dx/d*ca-dy/d*sa)*230, vy:(dx/d*sa+dy/d*ca)*230, life:4}); });
       }
       if(pl.hurt<=0 && b.inv<=0 && rectHit(pl,b)){
@@ -847,24 +851,25 @@ function render(){
     ctx.fillStyle='#4a2a3a'; ctx.fillRect(x0,y0,bw2,9);
     ctx.fillStyle='#ff5a8a'; ctx.fillRect(x0,y0,bw2*boss.hp/boss.maxHp,9);
     ctx.fillStyle='#fff'; ctx.font='bold 12px sans-serif'; ctx.textAlign='center';
-    ctx.fillText('👑 RAINBOW KING',VW/2,y0+22);
+    ctx.fillText('👑 '+boss.nm,VW/2,y0+22);
   }
 }
 function drawBoss(){ const b=boss, bw=b.w, bh=b.h, cx=b.x+bw/2, by=b.y;
-  const wob=Math.sin(performance.now()/140)*3;
+  const wob=Math.sin(performance.now()/140)*3, s=bh/66;
   const flash=b.inv>0 && Math.floor(performance.now()/90)%2===0;
+  const eyeY=by+bh*0.4;
   ctx.fillStyle='rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(cx,by+bh,bw*0.5,6,0,0,7); ctx.fill();
-  ctx.fillStyle=flash?'#f0c0f0':'#b05ac0';
+  ctx.fillStyle=flash?'#f0e0f0':b.col;
   ctx.beginPath(); ctx.moveTo(b.x+4,by+bh); ctx.quadraticCurveTo(b.x,by+wob,cx,by+wob);
   ctx.quadraticCurveTo(b.x+bw,by+wob,b.x+bw-4,by+bh); ctx.closePath(); ctx.fill();
   ctx.fillStyle='#ffd54a'; ctx.beginPath();
-  ctx.moveTo(cx-20,by+wob-2); ctx.lineTo(cx-20,by+wob-16); ctx.lineTo(cx-10,by+wob-6); ctx.lineTo(cx,by+wob-18);
-  ctx.lineTo(cx+10,by+wob-6); ctx.lineTo(cx+20,by+wob-16); ctx.lineTo(cx+20,by+wob-2); ctx.closePath(); ctx.fill();
-  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(cx-14,by+26,9,0,7); ctx.arc(cx+14,by+26,9,0,7); ctx.fill();
-  ctx.fillStyle='#222'; const ex=b.face*3; ctx.beginPath(); ctx.arc(cx-14+ex,by+27,4,0,7); ctx.arc(cx+14+ex,by+27,4,0,7); ctx.fill();
-  ctx.strokeStyle='#5a1050'; ctx.lineWidth=3;
-  ctx.beginPath(); ctx.moveTo(cx-24,by+14); ctx.lineTo(cx-6,by+20); ctx.moveTo(cx+24,by+14); ctx.lineTo(cx+6,by+20); ctx.stroke();
-  ctx.beginPath(); ctx.arc(cx,by+46,6,1.1*Math.PI,1.9*Math.PI); ctx.stroke();
+  ctx.moveTo(cx-20*s,by+wob-2); ctx.lineTo(cx-20*s,by+wob-16*s); ctx.lineTo(cx-10*s,by+wob-6*s); ctx.lineTo(cx,by+wob-18*s);
+  ctx.lineTo(cx+10*s,by+wob-6*s); ctx.lineTo(cx+20*s,by+wob-16*s); ctx.lineTo(cx+20*s,by+wob-2); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(cx-14*s,eyeY,9*s,0,7); ctx.arc(cx+14*s,eyeY,9*s,0,7); ctx.fill();
+  ctx.fillStyle='#222'; const ex=b.face*3; ctx.beginPath(); ctx.arc(cx-14*s+ex,eyeY+1,4*s,0,7); ctx.arc(cx+14*s+ex,eyeY+1,4*s,0,7); ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,.5)'; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(cx-24*s,eyeY-12*s); ctx.lineTo(cx-6*s,eyeY-6*s); ctx.moveTo(cx+24*s,eyeY-12*s); ctx.lineTo(cx+6*s,eyeY-6*s); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,by+bh*0.7,6*s,1.1*Math.PI,1.9*Math.PI); ctx.stroke();
 }
 function drawBox(bx){ const x=bx.x, y=bx.y, w=bx.w, h=bx.h;
   const col=['#e2506a','#4aa8e2','#8a5cd0','#3fbf5a'][((x/TILE)|0)%4];
