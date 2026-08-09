@@ -116,7 +116,7 @@
 </div>
 
 <script>
-const APP_VERSION='v6';
+const APP_VERSION='v7';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -158,6 +158,10 @@ const LEVELS=[
       [12,20,33,50,66,80,102,110,130,155,175].forEach(x=>L.en(x));
       L.jump(60); L.jump(140); L.jump(165);
       L.spk(38,2); L.spk(62,2); L.spk(85,2); L.spk(125,2); L.spk(160,2);
+      // sky route (climb from the x≈15 platforms)
+      L.plat(20,3,3); L.plat(26,1,3); L.plat(32,-1,3); L.plat(38,-3,4); L.plat(46,-4,5); L.plat(54,-3,4); L.plat(62,-4,5); L.plat(70,-3,4); L.plat(78,-4,5); L.plat(86,-3,4);
+      L.coin(46,-6,5); L.coin(62,-6,5); L.coin(78,-6,5); L.coin(32,-3,3);
+      L.fly(50,-1); L.fly(74,-1);
     } },
   { name:'Crystal Cavern', W:180, music:'cave',
     theme:{ sky:['#241a3a','#3a2c55'], hillA:'#2e2450', hillB:'#241b40', dirt:'#4a4358', cap:'#8f7fc0', platA:'#7a6aa0', platB:'#4a4066', spike:'#b8c4e0' },
@@ -174,6 +178,10 @@ const LEVELS=[
       [12,20,38,46,64,72,90,98,108,126,144,162].forEach(x=>L.en(x));
       L.shoot(56); L.shoot(100); L.shoot(150);
       L.spk(44,2); L.spk(70,2); L.spk(110,2); L.spk(146,2);
+      // upper cavern route (below the raised ceiling)
+      L.plat(20,4,3); L.plat(26,2,3); L.plat(32,0,3); L.plat(38,-2,4); L.plat(46,-3,5); L.plat(54,-2,4); L.plat(62,-3,5); L.plat(70,-2,4);
+      L.coin(46,-5,5); L.coin(62,-5,5); L.coin(38,-4,4);
+      L.fly(50,0); L.fly(66,0);
     } },
   { name:'Sky Islands', W:180, cloudy:true, music:'breezy',
     theme:{ sky:['#bfe6ff','#e9f6ff'], hillA:null, hillB:null, dirt:'#7a4a24', cap:'#5cbf46', platA:'#c98a3a', platB:'#8a5a22', spike:'#c9d0da' },
@@ -187,6 +195,10 @@ const LEVELS=[
       L.coin(35,4,3); L.coin(65,4,3); L.coin(95,4,3); L.coin(125,4,3); L.coin(155,4,3);   // high-reward (double-jump)
       L.en(22,8); L.en(62,8); L.en(102,8); L.en(142,8);
       L.fly(15); L.fly(40); L.fly(75); L.fly(110); L.fly(135); L.fly(158);
+      // sky route above the islands
+      L.island(16,5,3); L.island(21,3,3); L.island(26,1,3); L.island(31,-1,3); L.island(38,-2,4); L.island(46,-3,4); L.island(54,-2,4); L.island(62,-3,4); L.island(70,-2,4); L.island(78,-3,4); L.island(86,-2,4);
+      L.coin(46,-5,4); L.coin(62,-5,4); L.coin(78,-5,4); L.coin(31,-3,3);
+      L.fly(50,-1); L.fly(74,0);
     } },
   { name:'Lava Ruins', W:185, music:'danger',
     theme:{ sky:['#3a1414','#6e2a1a'], hillA:'#3a1e14', hillB:'#2a1410', dirt:'#3a2a2a', cap:'#5a3a2a', platA:'#7a4a2a', platB:'#4a2a1a', spike:'#e0b0a0', hazard:'#ff5a1e' },
@@ -199,6 +211,10 @@ const LEVELS=[
       [10,30,46,62,78,94,110].forEach(x=>L.en(x));
       L.chase(44); L.chase(92); L.chase(140); L.chase(170);
       L.spk(27,2); L.spk(43,2); L.spk(59,3); L.spk(75,2); L.spk(91,3); L.spk(107,2); L.spk(123,2); L.spk(139,3); L.spk(155,2); L.spk(171,2);
+      // sky route above the lava
+      L.plat(30,4,3); L.plat(36,2,3); L.plat(42,0,3); L.plat(48,-2,4); L.plat(56,-3,5); L.plat(64,-2,4); L.plat(72,-3,5); L.plat(80,-2,4);
+      L.coin(56,-5,5); L.coin(72,-5,5); L.coin(48,-4,4);
+      L.fly(60,0); L.fly(76,0);
     } },
   { name:'Frost Peaks', W:200, music:'icy',
     theme:{ sky:['#cfe8ff','#ffffff'], hillA:'#dbeeff', hillB:'#c3e0f5', dirt:'#a9c6e0', cap:'#ffffff', platA:'#bcdcf0', platB:'#8fb6d6', spike:'#dff0ff' },
@@ -214,6 +230,10 @@ const LEVELS=[
       [14,38,54,72,88,104,120,150,180].forEach(x=>L.en(x));
       L.jump(66); L.jump(140); L.fly(90); L.fly(165); L.shoot(112);
       L.spk(46,2); L.spk(78,2); L.spk(112,2); L.spk(148,2); L.spk(178,2);
+      // summit route
+      L.plat(80,2,3); L.plat(86,0,3); L.plat(92,-2,3); L.plat(98,-3,4); L.plat(106,-4,5); L.plat(114,-3,4); L.plat(122,-4,5); L.plat(130,-3,4);
+      L.coin(106,-6,5); L.coin(122,-6,5); L.coin(98,-5,4);
+      L.fly(110,-1); L.fly(126,-1);
     } },
   { name:'Mushroom Hollow', W:195, music:'cheery',
     theme:{ sky:['#6fd0a8','#c8f0dd'], hillA:'#5bbf90', hillB:'#48a578', dirt:'#6a4a34', cap:'#d85a8a', platA:'#c86a9a', platB:'#9a4a70', spike:'#d8c0ca' },
@@ -228,6 +248,10 @@ const LEVELS=[
       L.jump(15); L.jump(35); L.jump(58); L.jump(85); L.jump(110); L.jump(138); L.jump(165); L.jump(178);
       [26,50,95,120,150].forEach(x=>L.en(x));
       L.spk(44,2); L.spk(98,2); L.spk(154,2);
+      // canopy route
+      L.plat(26,3,3); L.plat(32,1,3); L.plat(38,-1,3); L.plat(44,-3,4); L.plat(52,-4,5); L.plat(60,-3,4); L.plat(68,-4,5); L.plat(76,-3,4);
+      L.coin(52,-6,5); L.coin(68,-6,5); L.coin(44,-5,4);
+      L.fly(56,-1); L.fly(72,-1);
     } },
   { name:'Windy Cliffs', W:185, cloudy:true, music:'breezy',
     theme:{ sky:['#a8d8f0','#e8f6ff'], hillA:null, hillB:null, dirt:'#8a7a6a', cap:'#c0d0dc', platA:'#b0c4d4', platB:'#8098ac', spike:'#dfeef8' },
@@ -240,6 +264,10 @@ const LEVELS=[
       L.coin(91,7,4); L.coin(111,6,4); L.coin(121,8,4); L.coin(133,7,4); L.coin(163,8,4); L.coin(175,7,4);
       L.fly(15); L.fly(35); L.fly(55); L.fly(75); L.fly(95); L.fly(115); L.fly(140); L.fly(160);
       L.en(22,8); L.en(80,8); L.en(120,8);
+      // high-wind route
+      L.island(24,5,3); L.island(29,3,3); L.island(34,1,3); L.island(39,-1,3); L.island(46,-2,4); L.island(54,-3,4); L.island(62,-2,4); L.island(70,-3,4); L.island(78,-2,4);
+      L.coin(54,-5,4); L.coin(70,-5,4); L.coin(39,-3,3);
+      L.fly(50,-1); L.fly(66,0);
     } },
   { name:'Clockwork Foundry', W:190, music:'cave',
     theme:{ sky:['#2a2e38','#464c5a'], hillA:'#333a46', hillB:'#282e38', dirt:'#4a4e58', cap:'#8a929e', platA:'#7a828e', platB:'#4a525e', spike:'#c0c8d4' },
@@ -252,6 +280,10 @@ const LEVELS=[
       L.shoot(20); L.shoot(50); L.shoot(78); L.shoot(106); L.shoot(134); L.shoot(162);
       [15,44,72,100,128,156,180].forEach(x=>L.en(x));
       L.spk(52,2); L.spk(108,2); L.spk(164,2);
+      // catwalk route above the machines
+      L.plat(28,3,3); L.plat(34,1,3); L.plat(40,-1,3); L.plat(46,-3,4); L.plat(54,-4,5); L.plat(62,-3,4); L.plat(70,-4,5); L.plat(78,-3,4);
+      L.coin(54,-6,5); L.coin(70,-6,5); L.coin(46,-5,4);
+      L.fly(58,-1); L.fly(74,-1);
     } },
   { name:'Poison Bog', W:190, music:'danger',
     theme:{ sky:['#3a4a2a','#5a6a3a'], hillA:'#3a4a2a', hillB:'#2a3a1e', dirt:'#3a3a2a', cap:'#7a9a4a', platA:'#6a8a3a', platB:'#3a5a1a', spike:'#b0d060', hazard:'#7ac83a' },
@@ -264,6 +296,10 @@ const LEVELS=[
       L.chase(30); L.chase(62); L.chase(94); L.chase(126); L.chase(158); L.chase(184);
       [12,44,76,108,140,172].forEach(x=>L.en(x));
       L.spk(28,2); L.spk(60,3); L.spk(92,2); L.spk(124,3); L.spk(156,2);
+      // treetop route above the bog
+      L.plat(30,4,3); L.plat(36,2,3); L.plat(42,0,3); L.plat(48,-2,4); L.plat(56,-3,5); L.plat(64,-2,4); L.plat(72,-3,5); L.plat(80,-2,4);
+      L.coin(56,-5,5); L.coin(72,-5,5); L.coin(48,-4,4);
+      L.fly(60,0); L.fly(76,0);
     } },
   { name:'Storm Fortress', W:195, music:'cave',
     theme:{ sky:['#2a2440','#4a3a66'], hillA:'#332a4e', hillB:'#241e3a', dirt:'#3a3450', cap:'#6a5a8a', platA:'#5a4a7a', platB:'#3a2e56', spike:'#c0b0e0' },
@@ -277,6 +313,10 @@ const LEVELS=[
       L.shoot(38); L.shoot(94); L.shoot(150);
       [16,64,120,176].forEach(x=>L.en(x));
       L.spk(50,2); L.spk(106,2); L.spk(162,2);
+      // battlements route
+      L.plat(74,2,3); L.plat(80,0,3); L.plat(86,-2,3); L.plat(92,-3,4); L.plat(100,-4,5); L.plat(108,-3,4); L.plat(116,-4,5); L.plat(124,-3,4);
+      L.coin(100,-6,5); L.coin(116,-6,5); L.coin(92,-5,4);
+      L.fly(104,-1); L.fly(120,-1);
     } },
   { name:'Obsidian Depths', W:200, music:'danger',
     theme:{ sky:['#18141e','#2e2436'], hillA:'#221c2a', hillB:'#161020', dirt:'#2a2430', cap:'#5a3a5a', platA:'#4a3a4a', platB:'#2a1e2a', spike:'#e08090', hazard:'#ff4a3a' },
@@ -292,6 +332,10 @@ const LEVELS=[
       L.fly(30); L.fly(70); L.fly(110); L.fly(150); L.fly(190);
       L.shoot(50); L.shoot(90); L.shoot(130); L.shoot(170);
       L.spk(24,2); L.spk(64,2); L.spk(104,2); L.spk(144,2); L.spk(184,2);
+      // upper depths route
+      L.plat(40,3,3); L.plat(46,1,3); L.plat(52,-1,3); L.plat(58,-3,4); L.plat(66,-4,5); L.plat(74,-3,4); L.plat(82,-4,5); L.plat(90,-3,4);
+      L.coin(66,-6,5); L.coin(82,-6,5); L.coin(58,-5,4);
+      L.fly(70,-1); L.fly(86,-1);
     } },
   { name:'Rainbow Summit', W:215, music:'finale',
     theme:{ sky:['#ff9ec8','#ffe0a0'], hillA:'#b0e0ff', hillB:'#ffc0e0', dirt:'#a06ac0', cap:'#ffd54a', platA:'#7ad0ff', platB:'#c86ad0', spike:'#ffffff' },
@@ -309,33 +353,39 @@ const LEVELS=[
       L.shoot(64); L.shoot(130); L.shoot(196);
       [14,100,170].forEach(x=>L.en(x));
       L.spk(42,2); L.spk(86,2); L.spk(130,2); L.spk(174,2);
+      // rainbow-top route
+      L.plat(42,2,3); L.plat(48,0,3); L.plat(54,-2,3); L.plat(60,-4,4); L.plat(68,-5,5); L.plat(76,-4,4); L.plat(84,-5,5); L.plat(92,-4,4); L.plat(100,-5,5); L.plat(108,-4,4);
+      L.coin(68,-7,5); L.coin(84,-7,5); L.coin(100,-7,5); L.coin(60,-6,4);
+      L.fly(72,-2); L.fly(96,-2);
     } },
 ];
 
+const SKY=8;  // rows of climbable sky above every level; build() coords stay in the
+              // original 13-row space (negative y = sky), the api shifts them down
 function buildLevel(idx){
   curLevel=((idx%LEVELS.length)+LEVELS.length)%LEVELS.length;
   const def=LEVELS[curLevel]; curTheme=def.theme; curName=def.name;
-  H=13; W=def.W; grid=Array.from({length:H},()=>new Array(W).fill(0));
+  H=13+SKY; W=def.W; grid=Array.from({length:H},()=>new Array(W).fill(0));
   coins=[]; enemies=[]; spikes=[]; projectiles=[];
-  const GT=H-3;                    // ground-top row
+  const GT=10;                     // ground-top row (build-space)
   const api={
     ground(pits){ const isPit=x=>pits&&pits.some(([a,b])=>x>=a&&x<=b);
-      for(let x=0;x<W;x++) if(!isPit(x)) for(let y=GT;y<H;y++) grid[y][x]=1; },
-    island(x,y,w,h=1){ for(let j=0;j<h;j++) for(let i=0;i<w;i++) if(x+i<W&&y+j<H) grid[y+j][x+i]=1; },
-    plat(x,y,w){ for(let i=0;i<w;i++) if(x+i<W) grid[y][x+i]=2; },
+      for(let x=0;x<W;x++) if(!isPit(x)) for(let y=GT;y<13;y++) grid[y+SKY][x]=1; },
+    island(x,y,w,h=1){ for(let j=0;j<h;j++) for(let i=0;i<w;i++){ const r=y+j+SKY; if(x+i<W&&r>=0&&r<H) grid[r][x+i]=1; } },
+    plat(x,y,w){ const r=y+SKY; if(r<0||r>=H) return; for(let i=0;i<w;i++) if(x+i<W) grid[r][x+i]=2; },
     ceiling(){ for(let x=0;x<W;x++) grid[0][x]=1; },
-    coin(x,y,n=1,dir=1){ for(let i=0;i<n;i++) coins.push({x:(x+i*dir)*TILE+TILE/2, y:y*TILE+TILE/2, got:false}); },
-    en(x,y=GT-1){ enemies.push({type:'walk', x:x*TILE, y:y*TILE-2, w:30,h:30, vx:60, vy:0, dir:-1, alive:true, stun:0}); },
-    fly(x,y=GT-4){ enemies.push({type:'fly', x:x*TILE, y:y*TILE, w:32,h:24, vx:80, vy:0, dir:-1, alive:true, stun:0, baseY:y*TILE, phase:x*0.7}); },
-    jump(x,y=GT-1){ enemies.push({type:'jump', x:x*TILE, y:y*TILE-2, w:30,h:30, vx:45, vy:0, dir:-1, alive:true, stun:0, t:(x%3)*0.4, onGround:false}); },
-    shoot(x,y=GT-1){ enemies.push({type:'shoot', x:x*TILE, y:y*TILE-2, w:30,h:32, vx:0, vy:0, dir:-1, alive:true, stun:0, t:1.4, onGround:false}); },
-    chase(x,y=GT-1){ enemies.push({type:'chase', x:x*TILE, y:y*TILE-2, w:30,h:30, vx:60, vy:0, dir:-1, alive:true, stun:0, chasing:false, onGround:false}); },
-    spk(x,w,y=GT){ for(let i=0;i<w;i++) spikes.push({x:(x+i)*TILE, y:y*TILE}); },
+    coin(x,y,n=1,dir=1){ for(let i=0;i<n;i++) coins.push({x:(x+i*dir)*TILE+TILE/2, y:(y+SKY)*TILE+TILE/2, got:false}); },
+    en(x,y=GT-1){ enemies.push({type:'walk', x:x*TILE, y:(y+SKY)*TILE-2, w:30,h:30, vx:60, vy:0, dir:-1, alive:true, stun:0}); },
+    fly(x,y=GT-4){ enemies.push({type:'fly', x:x*TILE, y:(y+SKY)*TILE, w:32,h:24, vx:80, vy:0, dir:-1, alive:true, stun:0, baseY:(y+SKY)*TILE, phase:x*0.7}); },
+    jump(x,y=GT-1){ enemies.push({type:'jump', x:x*TILE, y:(y+SKY)*TILE-2, w:30,h:30, vx:45, vy:0, dir:-1, alive:true, stun:0, t:(x%3)*0.4, onGround:false}); },
+    shoot(x,y=GT-1){ enemies.push({type:'shoot', x:x*TILE, y:(y+SKY)*TILE-2, w:30,h:32, vx:0, vy:0, dir:-1, alive:true, stun:0, t:1.4, onGround:false}); },
+    chase(x,y=GT-1){ enemies.push({type:'chase', x:x*TILE, y:(y+SKY)*TILE-2, w:30,h:30, vx:60, vy:0, dir:-1, alive:true, stun:0, chasing:false, onGround:false}); },
+    spk(x,w,y=GT){ for(let i=0;i<w;i++) spikes.push({x:(x+i)*TILE, y:(y+SKY)*TILE}); },
   };
   def.build(api);
-  const fx=def.flagX!=null?def.flagX:(W-4), ft=def.flagTop!=null?def.flagTop:GT;
+  const fx=def.flagX!=null?def.flagX:(W-4), ft=(def.flagTop!=null?def.flagTop:GT)+SKY;
   flag={ x:fx*TILE, top:ft*TILE - TILE*6, h:TILE*6 };
-  const sx=def.startX!=null?def.startX:2, st=def.startTop!=null?def.startTop:GT;
+  const sx=def.startX!=null?def.startX:2, st=(def.startTop!=null?def.startTop:GT)+SKY;
   startPx={ x:sx*TILE, y:st*TILE-40 };
 }
 function solidAt(tx,ty){
@@ -351,7 +401,7 @@ function resetPlayer(){
   p={ x:startPx.x, y:startPx.y, w:24, h:30, vx:0, vy:0, onGround:false, face:1,
       jumps:0, coyote:0, jumpBuf:0, dashCd:0, dashT:0, pounding:false, trail:[], hurt:0, anim:0 };
   maxHearts=3+(has('heart')?1:0); hearts=maxHearts; coinsGot=0;
-  cam={x:0,y:0};
+  cam={x:0,y:Math.max(0,H*TILE-VH)};   // start looking at the ground, not the empty sky
 }
 function startGame(idx){ if(idx==null) idx=menuLevel; menuLevel=((idx%LEVELS.length)+LEVELS.length)%LEVELS.length; saveHero(); buildLevel(menuLevel); resetPlayer(); state='play'; winFlash=0; deathTimer=0; hideOverlays(); setTrack(LEVELS[menuLevel].music||'cheery'); }
 
