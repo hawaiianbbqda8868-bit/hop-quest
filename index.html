@@ -116,7 +116,7 @@
 </div>
 
 <script>
-const APP_VERSION='v9';
+const APP_VERSION='v10';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -413,7 +413,7 @@ let p, cam, coinsGot, hearts, maxHearts, state='start', winFlash=0, deathTimer=0
 function resetPlayer(){
   p={ x:startPx.x, y:startPx.y, w:24, h:30, vx:0, vy:0, onGround:false, face:1,
       jumps:0, coyote:0, jumpBuf:0, dashCd:0, dashT:0, pounding:false, trail:[], hurt:0, anim:0,
-      shieldT:0, wantBig:false, big:false, stars:0 };
+      shieldT:0, wantBig:false, big:false, stars:0, shootFlash:0 };
   maxHearts=3+(has('heart')?1:0); hearts=maxHearts; coinsGot=0;
   cam={x:0,y:Math.max(0,H*TILE-VH)};   // start looking at the ground, not the empty sky
 }
@@ -467,6 +467,7 @@ function update(dt){
   const pl=p; pl.anim+=dt;
   // timers
   pl.coyote-=dt; pl.jumpBuf-=dt; pl.dashCd-=dt; if(pl.hurt>0) pl.hurt-=dt;
+  if(pl.shootFlash>0) pl.shootFlash-=dt;
   if(pl.shieldT>0) pl.shieldT-=dt;
   if(pl.wantBig && !pl.big){ // grow only once there's room for the bigger body (feet stay planted)
     const nx=pl.x-(BIGW-pl.w)/2, ny=pl.y+pl.h-BIGH;
@@ -485,8 +486,8 @@ function update(dt){
   }
   // act button: star shot (if you have ammo), else dash / ground-pound
   if(keys.actEdge){ keys.actEdge=false;
-    if(pl.stars>0){ pl.stars--; sfx('star');
-      projectiles.push({x:pl.face>0?pl.x+pl.w:pl.x, y:pl.y+pl.h*0.35, vx:pl.face*430, vy:0, life:1.6, friendly:true}); }
+    if(pl.stars>0){ pl.stars--; sfx('star'); pl.shootFlash=0.09;
+      projectiles.push({x:pl.face>0?pl.x+pl.w+10:pl.x-10, y:pl.y+pl.h*0.5+3, vx:pl.face*430, vy:0, life:1.6, friendly:true}); }
     else if(has('pound') && !pl.onGround && !pl.pounding){ pl.pounding=true; pl.vy=POUND; pl.vx=0; }
     else if(has('dash') && pl.dashCd<=0){ pl.dashT=DASH_TIME; pl.dashCd=DASH_CD; pl.vy=Math.min(pl.vy,0); }
   }
@@ -862,6 +863,16 @@ function drawHero(){
     ctx.fillStyle='#222'; const ex=b.face*1.6; ctx.beginPath(); ctx.arc(cx-4+ex,cy-4,2,0,7); ctx.arc(cx+6+ex,cy-4,2,0,7); ctx.fill();
     // smile
     ctx.strokeStyle='#5a3a2a'; ctx.lineWidth=1.6; ctx.beginPath(); ctx.arc(cx+1,cy+3,3,0.1*Math.PI,0.9*Math.PI); ctx.stroke();
+    if(b.stars>0){ // star blaster in hand
+      const gs=b.big?1.5:1, gx=cx+b.face*(w/2+4*gs), gy=cy+3*gs;
+      ctx.fillStyle='#3a2a1a'; ctx.beginPath(); ctx.arc(cx+b.face*(w/2-1),gy,4*gs,0,7); ctx.fill();
+      ctx.fillStyle='#5a6470'; roundRect(gx-7*gs,gy-5*gs,14*gs,10*gs,3*gs); ctx.fill();
+      ctx.fillStyle='#8a94a0'; ctx.fillRect(gx+(b.face>0?5*gs:-13*gs),gy-3*gs,8*gs,6*gs);
+      ctx.fillStyle='#ffd54a'; ctx.beginPath(); ctx.arc(gx,gy,2.6*gs,0,7); ctx.fill();
+      if(b.shootFlash>0){ const mx=gx+b.face*15*gs;
+        ctx.fillStyle='rgba(255,230,140,.9)'; ctx.beginPath(); ctx.arc(mx,gy,6*gs,0,7); ctx.fill();
+        ctx.fillStyle='rgba(255,255,255,.95)'; ctx.beginPath(); ctx.arc(mx,gy,3*gs,0,7); ctx.fill(); }
+    }
     drawHat(cx,cy-h/2);
   }
   if(b.shieldT>0 && (b.shieldT>2 || Math.floor(performance.now()/120)%2===0)){
