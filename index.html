@@ -835,7 +835,7 @@ let p, cam, coinsGot, hearts, maxHearts, state='start', winFlash=0, deathTimer=0
 function resetPlayer(){
   p={ x:startPx.x, y:startPx.y, w:24, h:30, vx:0, vy:0, onGround:false, face:1,
       jumps:0, coyote:0, jumpBuf:0, dashCd:0, dashT:0, pounding:false, trail:[], hurt:0, anim:0,
-      shieldT:0, wantBig:false, big:false, stars:0, shootFlash:0, drillT:0, bubbles:0 };
+      shieldT:0, wantBig:false, big:false, stars:0, shootFlash:0, drillT:0, bubbles:0, blastT:0 };
   if(hatIs('cap')) p.stars=3;
   if(hatIs('crown')) p.shieldT=5;
   pet={ x:startPx.x-24, y:startPx.y, cd:0, bob:Math.random()*6 };
@@ -907,9 +907,9 @@ function update(dt){
   if(pl.inCannon){ const b2=pl.inCannon;
     b2.ang+=b2.angV*dt; if(b2.ang<0.35){ b2.ang=0.35; b2.angV*=-1; } if(b2.ang>2.79){ b2.ang=2.79; b2.angV*=-1; }
     pl.x=b2.x-pl.w/2; pl.y=b2.y-pl.h/2-6; pl.vx=0; pl.vy=0; pl.pounding=false;
-    if(pl.jumpBuf>0){ pl.jumpBuf=0; const sp=980;
+    if(pl.jumpBuf>0){ pl.jumpBuf=0; const sp=1400;
       pl.vx=Math.cos(b2.ang)*sp; pl.vy=-Math.abs(Math.sin(b2.ang))*sp;
-      pl.face=pl.vx>=0?1:-1; pl.inCannon=null; b2.cd=1.5; pl.jumps=1; pl.coyote=0;
+      pl.face=pl.vx>=0?1:-1; pl.inCannon=null; b2.cd=1.5; pl.jumps=1; pl.coyote=0; pl.blastT=4;
       sfx('cannon'); addPop(b2.x,b2.y-10); }
   } else {
   // horizontal input
@@ -917,10 +917,11 @@ function update(dt){
   if(dir) pl.face=dir;
   const riding=skate&&skate.state==='ride';
   const a=pl.onGround?ACC:AIRACC, run2=riding?340:RUN;
+  if(pl.blastT>0){ pl.blastT-=dt; if(pl.onGround) pl.blastT=0; }   // cannon-blast momentum lasts until touchdown
   if(pl.dashT>0){ pl.dashT-=dt; pl.vx=DASH_SPD*pl.face; }
   else{
-    if(dir){ pl.vx+=dir*a*dt; pl.vx=Math.max(-run2,Math.min(run2,pl.vx)); }
-    else{ const f=FRIC*(riding&&(pl.onGround||pl.coyote>0)?0.3:1)*dt; if(pl.vx>0) pl.vx=Math.max(0,pl.vx-f); else pl.vx=Math.min(0,pl.vx+f); }   // boards coast
+    if(dir){ pl.vx+=dir*a*dt; const cap=pl.blastT>0?Math.max(run2,Math.abs(pl.vx)):run2; pl.vx=Math.max(-cap,Math.min(cap,pl.vx)); }
+    else if(pl.blastT<=0){ const f=FRIC*(riding&&(pl.onGround||pl.coyote>0)?0.3:1)*dt; if(pl.vx>0) pl.vx=Math.max(0,pl.vx-f); else pl.vx=Math.min(0,pl.vx+f); }   // boards coast; blasts fly friction-free
   }
   // act button: star shot (if you have ammo), else dash / ground-pound
   if(keys.actEdge){ keys.actEdge=false;
@@ -946,7 +947,7 @@ function update(dt){
   }
   // variable jump height (release early = shorter)
   const hg=hatIs('astro')?0.92:1;   // moon boots
-  if(!keys.jump && pl.vy<0) pl.vy+=G*gMul*hg*1.6*dt;
+  if(!keys.jump && pl.vy<0 && pl.blastT<=0) pl.vy+=G*gMul*hg*1.6*dt;   // (cannon blasts keep their full arc)
   // gravity + glide (gMul drops during the low-gravity wonder effect)
   pl.vy+=G*gMul*hg*dt;
   if(has('glide') && keys.jump && pl.vy>0 && !pl.pounding) pl.vy=Math.min(pl.vy,GLIDE);
@@ -1015,7 +1016,7 @@ function update(dt){
     }
     if(en.y>H*TILE+80){ en.alive=false; continue; }
     // vs player — stomp/pound from above kills; flyers count too
-    if(pl.hurt<=0 && rectHit(pl,en)){
+    if(pl.hurt<=0 && !pl.inCannon && rectHit(pl,en)){
       if(pl.big){ en.alive=false; addPop(en.x+en.w/2,en.y); sfx('stomp'); dropLoot(en); }   // giant hero squashes on touch
       else if((pl.vy>0 && (pl.y+pl.h)-en.y < 20) || pl.pounding){
         en.alive=false; if(!pl.pounding) pl.vy=-460; addPop(en.x+en.w/2,en.y); sfx('stomp'); dropLoot(en);
@@ -1039,7 +1040,7 @@ function update(dt){
         break; } }
       continue;
     }
-    if(pl.hurt<=0 && pl.x+pl.w-4>pr.x-6 && pl.x+4<pr.x+6 && pl.y+pl.h-4>pr.y-6 && pl.y+4<pr.y+6){ pr.dead=true; hitPlayer(); }
+    if(pl.hurt<=0 && !pl.inCannon && pl.x+pl.w-4>pr.x-6 && pl.x+4<pr.x+6 && pl.y+pl.h-4>pr.y-6 && pl.y+4<pr.y+6){ pr.dead=true; hitPlayer(); }
   }
   // boss fight — awakens when you cross into the arena
   if(boss&&boss.alive){
@@ -1216,6 +1217,7 @@ function bossHit(){ const b=boss; if(!b||!b.alive) return;
   }
 }
 function hitPlayer(){ if(p.hurt>0) return;
+  if(p.inCannon) return;                                  // snug and safe inside the barrel
   if(p.shieldT>0){ p.hurt=0.4; sfx('shield'); return; }   // shield soaks the hit
   if(frog && frog.state==='ride'){ frog.state='flee'; frog.fleeT=2.2; frog.dir=-(p.face||1);   // frog takes the hit and flees
     frog.y=p.y+p.h-24; p.hurt=1.1; p.vy=-260; sfx('hurt'); toasts.push({x:frog.x+13,y:frog.y-16,ic:'🐸',t:1.2}); return; }
@@ -1232,7 +1234,7 @@ function respawnAtCheckpoint(){ // hearts refill; coins, gems and defeated enemi
   state='play'; winFlash=0; deathTimer=0;
   p={ x:checkpoint.x-6, y:checkpoint.y-34, w:SMALLW, h:SMALLH, vx:0, vy:0, onGround:false, face:1,
       jumps:0, coyote:0, jumpBuf:0, dashCd:0, dashT:0, pounding:false, trail:[], hurt:1.2, anim:0,
-      shieldT:0, wantBig:false, big:false, stars:0, shootFlash:0, drillT:0, bubbles:0 };
+      shieldT:0, wantBig:false, big:false, stars:0, shootFlash:0, drillT:0, bubbles:0, blastT:0 };
   pet={ x:p.x-24, y:p.y, cd:0, bob:0 };
   hearts=maxHearts; gMul=1; wonderT=0; wonderFx=null;
   if(skate&&skate.state==='ride') skate=null;            // a ridden board is lost with you
@@ -1420,8 +1422,8 @@ function render(){
   // cannons
   for(const cn of cannons){ const loaded=p&&p.inCannon===cn;
     if(loaded){ ctx.fillStyle='rgba(255,255,255,.5)';   // dotted aim preview
-      for(let k=1;k<=5;k++){ const tt=k*0.12, px2=cn.x+Math.cos(cn.ang)*980*tt, py2=cn.y-10-Math.abs(Math.sin(cn.ang))*980*tt+0.5*G*tt*tt;
-        ctx.beginPath(); ctx.arc(px2,py2,3.4-k*0.4,0,7); ctx.fill(); } }
+      for(let k=1;k<=8;k++){ const tt=k*0.11, px2=cn.x+Math.cos(cn.ang)*1400*tt, py2=cn.y-10-Math.abs(Math.sin(cn.ang))*1400*tt+0.5*G*tt*tt;
+        ctx.beginPath(); ctx.arc(px2,py2,3.6-k*0.32,0,7); ctx.fill(); } }
     ctx.save(); ctx.translate(cn.x,cn.y-6); ctx.rotate(-cn.ang);
     ctx.fillStyle='#3a3f48'; roundRect(0,-9,30,18,6); ctx.fill();
     ctx.fillStyle='#565c68'; ctx.fillRect(24,-9,6,18); ctx.restore();
