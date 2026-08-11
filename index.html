@@ -142,7 +142,7 @@
 </div>
 
 <script>
-const APP_VERSION='v18';
+const APP_VERSION='v19';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -178,6 +178,7 @@ let wonderT=0, wonderFx=null, gMul=1;                   // wonder-flower effect 
 let rushMode=false, rushIdx=0, rushT=0, rushAdv=false;  // 👑 boss rush state
 let pet=null;                                           // 🐣 buddy: follows, grabs coins, blocks one hit
 let frog=null;                                          // 🐸 rideable mount
+let skate=null;                                         // 🛹 rideable skateboard
 let remixOn=false;                                      // 🔀 mirrored+spicier levels
 let ghostRec=[], ghostPlay=null, recT=0;                // 👻 best-run ghost
 let ghostStoreObj={};
@@ -696,7 +697,7 @@ function buildLevel(idx, defO){
   H=13+SKY; W=def.W; grid=Array.from({length:H},()=>new Array(W).fill(0));
   coins=[]; enemies=[]; spikes=[]; projectiles=[]; boxes=[]; presents=[]; toasts=[];
   springs=[]; movers=[]; gems=[]; checkpoint=null; wonder=null; wonderT=0; wonderFx=null; gMul=1;
-  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null; cannons=[];
+  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null; cannons=[]; skate=null;
   const GT=10;                     // ground-top row (build-space)
   const api={
     ground(pits){ const isPit=x=>pits&&pits.some(([a,b])=>x>=a&&x<=b);
@@ -725,13 +726,23 @@ function buildLevel(idx, defO){
   const floorRow=tx=>{ for(let r=H-1;r>=SKY;r--){ if(grid[r][tx] && !(r>0&&grid[r-1][tx])) return r; } return -1; };
   const clearOfStuff=tx=>!spikes.some(s=>Math.abs(s.x/TILE-tx)<2)&&!boxes.some(b=>Math.abs(b.x/TILE-tx)<2)&&!enemies.some(e=>e.type==='shoot'&&Math.abs(e.x/TILE-tx)<2);
   const safeCol=(target,skip)=>{ for(let d=0;d<W;d++) for(const tx of [target+d,target-d]){ if(tx<4||tx>W-8) continue; if(skip&&skip.includes(tx)) continue; const r=floorRow(tx); if(r<0) continue; if(clearOfStuff(tx)) return tx; } return -1; };
+  const airOK=(tx,head)=>{ const fr2=floorRow(tx); if(fr2<0) return false;        // open sky above: no tiles for `head` rows
+    for(let r=Math.max(0,fr2-head);r<fr2;r++) for(let d2=-1;d2<=1;d2++){ const c2=tx+d2; if(c2>=0&&c2<W&&grid[r][c2]) return false; } return true; };
+  const openCol=(target,head,skip)=>{ for(let d=0;d<W;d++) for(const tx of [target+d,target-d]){
+    if(tx<4||tx>W-8) continue; if(skip&&skip.includes(tx)) continue; if(floorRow(tx)<0) continue;
+    if(clearOfStuff(tx)&&airOK(tx,head)) return tx; } return -1; };
   const usedCols=[];
-  for(const fr of [0.3,0.65]){ const tx=safeCol(Math.round(W*fr),usedCols);       // bounce springs
+  for(const fr of [0.3,0.65]){ let tx=openCol(Math.round(W*fr),9,usedCols);       // bounce springs launch high — keep the sky clear
+    if(tx<0) tx=safeCol(Math.round(W*fr),usedCols);
     if(tx>=0){ usedCols.push(tx-1,tx,tx+1); const r=floorRow(tx); springs.push({x:tx*TILE+4,y:r*TILE-14,w:TILE-8,h:14,t:0}); } }
+  { const tx=safeCol(Math.round(W*0.08),usedCols);                                // 🛹 skateboard right near the start
+    if(tx>=0){ usedCols.push(tx-1,tx,tx+1);
+      skate={x:tx*TILE+4, y:floorRow(tx)*TILE-10, state:'idle', spinT:0}; } }
   { const tx=safeCol(Math.round(W*0.18),usedCols);                                // 🐸 frog mount waits early on
     if(tx>=0){ usedCols.push(tx-1,tx,tx+1);
       frog={x:tx*TILE+7, y:floorRow(tx)*TILE-24, w:26, h:24, vx:0, vy:0, state:'idle', hopT:2, dir:1, fleeT:0, tongueT:0.8, tx:0, ty:0, tShow:0, onG:false}; } }
-  { const tx=safeCol(Math.round(W*0.62),usedCols);                                // 🛢️ blast barrel
+  { let tx=openCol(Math.round(W*0.62),11,usedCols);                               // 🛢️ blast barrel needs open air for the arc
+    if(tx<0) tx=safeCol(Math.round(W*0.62),usedCols);
     if(tx>=0){ usedCols.push(tx-1,tx,tx+1);
       cannons.push({x:tx*TILE+20, y:floorRow(tx)*TILE-20, ang:Math.PI*0.65, angV:1.4, cd:0}); } }
   { const tx=safeCol(Math.round(W*0.5),usedCols);                                 // mid-level checkpoint
@@ -797,7 +808,7 @@ function buildRushArena(i){
   W=44; H=13+SKY; grid=Array.from({length:H},()=>new Array(W).fill(0));
   coins=[]; enemies=[]; spikes=[]; projectiles=[]; boxes=[]; presents=[]; toasts=[];
   springs=[]; movers=[]; gems=[]; checkpoint=null; wonder=null; wonderT=0; wonderFx=null; gMul=1;
-  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null; cannons=[]; remixOn=false; ghostPlay=null; dailyMode=false;
+  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null; cannons=[]; skate=null; remixOn=false; ghostPlay=null; dailyMode=false;
   initWX(def.name);
   for(let x=0;x<W;x++) for(let y=GT;y<13;y++) grid[y+SKY][x]=1;         // solid floor, no pits
   const lay=[[[6,7,3],[14,5,3],[35,7,3]],[[8,6,3],[20,4,3],[32,6,3]],[[5,7,3],[22,5,4],[37,7,3]]][i%3];
@@ -904,11 +915,12 @@ function update(dt){
   // horizontal input
   const dir=(keys.right?1:0)-(keys.left?1:0);
   if(dir) pl.face=dir;
-  const a=pl.onGround?ACC:AIRACC;
+  const riding=skate&&skate.state==='ride';
+  const a=pl.onGround?ACC:AIRACC, run2=riding?340:RUN;
   if(pl.dashT>0){ pl.dashT-=dt; pl.vx=DASH_SPD*pl.face; }
   else{
-    if(dir){ pl.vx+=dir*a*dt; pl.vx=Math.max(-RUN,Math.min(RUN,pl.vx)); }
-    else{ const f=FRIC*dt; if(pl.vx>0) pl.vx=Math.max(0,pl.vx-f); else pl.vx=Math.min(0,pl.vx+f); }
+    if(dir){ pl.vx+=dir*a*dt; pl.vx=Math.max(-run2,Math.min(run2,pl.vx)); }
+    else{ const f=FRIC*(riding&&(pl.onGround||pl.coyote>0)?0.3:1)*dt; if(pl.vx>0) pl.vx=Math.max(0,pl.vx-f); else pl.vx=Math.min(0,pl.vx+f); }   // boards coast
   }
   // act button: star shot (if you have ammo), else dash / ground-pound
   if(keys.actEdge){ keys.actEdge=false;
@@ -929,8 +941,8 @@ function update(dt){
   const canJump = pl.onGround || pl.coyote>0 || (has('double') && pl.jumps<2 && pl.jumps>0);
   const jm=(pl.big?1.35:1)*(frog&&frog.state==='ride'?1.28:1);   // giant hero and frog riders jump much higher
   if(pl.jumpBuf>0){
-    if(pl.onGround||pl.coyote>0){ pl.vy=-(JUMP*(has('highjump')?1.3:1)*jm); pl.jumps=1; pl.jumpBuf=0; pl.coyote=0; pl.onGround=false; }
-    else if(has('double') && pl.jumps===1){ pl.vy=-(JUMP*(has('highjump')?1.28:1.1)*jm); pl.jumps=2; pl.jumpBuf=0; }
+    if(pl.onGround||pl.coyote>0){ pl.vy=-(JUMP*(has('highjump')?1.3:1)*jm); pl.jumps=1; pl.jumpBuf=0; pl.coyote=0; pl.onGround=false; if(riding) skate.spinT=0.45; }
+    else if(has('double') && pl.jumps===1){ pl.vy=-(JUMP*(has('highjump')?1.28:1.1)*jm); pl.jumps=2; pl.jumpBuf=0; if(riding) skate.spinT=0.45; }
   }
   // variable jump height (release early = shorter)
   const hg=hatIs('astro')?0.92:1;   // moon boots
@@ -1007,6 +1019,8 @@ function update(dt){
       if(pl.big){ en.alive=false; addPop(en.x+en.w/2,en.y); sfx('stomp'); dropLoot(en); }   // giant hero squashes on touch
       else if((pl.vy>0 && (pl.y+pl.h)-en.y < 20) || pl.pounding){
         en.alive=false; if(!pl.pounding) pl.vy=-460; addPop(en.x+en.w/2,en.y); sfx('stomp'); dropLoot(en);
+      } else if(skate&&skate.state==='ride' && (pl.onGround||pl.coyote>0) && Math.abs(pl.vx)>240){   // speed ram!
+        en.alive=false; addPop(en.x+en.w/2,en.y); sfx('stomp'); dropLoot(en); pl.vx*=0.72;
       } else hitPlayer();
     }
   }
@@ -1087,7 +1101,7 @@ function update(dt){
   // springs — land on one to launch skyward
   for(const s of springs){ if(s.t>0) s.t-=dt;
     if(pl.vy>0 && pl.x+pl.w>s.x+2 && pl.x<s.x+s.w-2 && pl.y+pl.h>s.y-2 && pl.y+pl.h<s.y+s.h+14){
-      pl.y=s.y-pl.h; pl.vy=hatIs('horn')?-1380:-1150; pl.jumps=1; pl.pounding=false; s.t=0.3; sfx('spring'); } }
+      pl.y=s.y-pl.h; pl.vy=hatIs('horn')?-1650:-1400; pl.jumps=1; pl.pounding=false; s.t=0.3; sfx('spring'); } }
   // moving platforms — one-way top surface that carries the player
   for(const m of movers){ const dxm=m.vx*dt; m.x+=dxm; if(m.x<m.x0||m.x>m.x1){ m.vx*=-1; m.x=Math.max(m.x0,Math.min(m.x,m.x1)); }
     if(pl.vy>=0 && pl.x+pl.w>m.x+4 && pl.x<m.x+m.w-4){ const pb=pl.y+pl.h;
@@ -1121,6 +1135,14 @@ function update(dt){
   // ghost recorder (10Hz, normal runs only)
   if(!rushMode && !remixOn){ recT+=dt;
     while(recT>=0.1){ recT-=0.1; if(ghostRec.length<6000){ ghostRec.push(Math.round(pl.x),Math.round(pl.y)); } } }
+  // skateboard 🛹
+  if(skate){
+    if(skate.spinT>0) skate.spinT-=dt;
+    if(skate.state==='idle'){
+      if(pl.hurt<=0 && Math.abs(pl.x+pl.w/2-(skate.x+16))<26 && Math.abs(pl.y+pl.h-(skate.y+10))<30){
+        skate.state='ride'; sfx('power'); toasts.push({x:skate.x+16,y:skate.y-18,ic:'🛹',t:1.2}); }
+    } else if(skate.state==='ride'){ skate.x=pl.x+pl.w/2-16; skate.y=pl.y+pl.h-6; }
+  }
   // frog mount 🐸
   if(frog){
     if(frog.state==='idle'){
@@ -1197,6 +1219,9 @@ function hitPlayer(){ if(p.hurt>0) return;
   if(p.shieldT>0){ p.hurt=0.4; sfx('shield'); return; }   // shield soaks the hit
   if(frog && frog.state==='ride'){ frog.state='flee'; frog.fleeT=2.2; frog.dir=-(p.face||1);   // frog takes the hit and flees
     frog.y=p.y+p.h-24; p.hurt=1.1; p.vy=-260; sfx('hurt'); toasts.push({x:frog.x+13,y:frog.y-16,ic:'🐸',t:1.2}); return; }
+  if(skate && skate.state==='ride'){ addPop(skate.x+16,skate.y);   // the board breaks instead
+    toasts.push({x:skate.x+16,y:skate.y-14,ic:'🛹💥',t:1.2}); skate=null;
+    p.hurt=1.1; p.vy=-260; sfx('hurt'); return; }
   if(pet && pet.cd<=0){ pet.cd=20; p.hurt=1.1; sfx('shield');   // pet bravely blocks the hit
     addPop(pet.x,pet.y); toasts.push({x:pet.x,y:pet.y-18,ic:'🐣',t:1.2}); return; }
   if(p.big||p.wantBig){ p.wantBig=false; p.hurt=1.1; p.vy=-320; p.vx=-p.face*260; sfx('hurt'); return; }  // lose your size, not a heart
@@ -1210,6 +1235,7 @@ function respawnAtCheckpoint(){ // hearts refill; coins, gems and defeated enemi
       shieldT:0, wantBig:false, big:false, stars:0, shootFlash:0, drillT:0, bubbles:0 };
   pet={ x:p.x-24, y:p.y, cd:0, bob:0 };
   hearts=maxHearts; gMul=1; wonderT=0; wonderFx=null;
+  if(skate&&skate.state==='ride') skate=null;            // a ridden board is lost with you
   if(boss&&boss.alive&&boss.active) boss.active=false;   // boss resets its ambush until you return
   setTrack(LEVELS[curLevel].music||'cheery');
   toasts.push({x:p.x+12,y:p.y-24,ic:'🚩',t:1.2});
@@ -1464,6 +1490,7 @@ function render(){
   }
   // frog mount 🐸 (drawn under the hero while ridden)
   if(frog) drawFrog();
+  if(skate) drawSkate();
   // player (hidden while loaded in a cannon)
   if(p&&!p.inCannon) drawHero();
   if(pet) drawPet();
@@ -1621,6 +1648,20 @@ function drawHero(){
     ctx.beginPath(); ctx.arc(cx,cy,Math.max(b.w,b.h)*0.75,0,7); ctx.fill(); ctx.stroke();
   }
 }
+function drawSkate(){ const s=skate;
+  ctx.save(); ctx.translate(s.x+16,s.y+5);
+  let rot=0;
+  if(s.state==='ride'){ rot=Math.max(-0.18,Math.min(0.18,(p&&p.vx||0)/1800));
+    if(s.spinT>0) rot=(0.45-s.spinT)/0.45*Math.PI*2; }   // kickflip!
+  ctx.rotate(rot);
+  ctx.fillStyle='#e2506a'; roundRect(-17,-4,34,7,3); ctx.fill();                                   // deck
+  ctx.fillStyle='#ffd54a'; ctx.fillRect(-15,-4,30,2);
+  ctx.fillStyle='#2a2e36'; ctx.beginPath(); ctx.arc(-10,5,4,0,7); ctx.arc(10,5,4,0,7); ctx.fill(); // wheels
+  ctx.fillStyle='#8a94a0'; ctx.beginPath(); ctx.arc(-10,5,1.6,0,7); ctx.arc(10,5,1.6,0,7); ctx.fill();
+  ctx.restore();
+  if(s.state==='idle' && Math.floor(performance.now()/700)%3===0){
+    ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='10px sans-serif'; ctx.textAlign='center'; ctx.fillText('ride me!',s.x+16,s.y-14); }
+}
 function drawFrog(){ const f=frog, fx2=f.x+13, fy2=f.y+12;
   if(f.tShow>0){ ctx.strokeStyle='#ff7a9a'; ctx.lineWidth=3;   // tongue slurp!
     ctx.beginPath(); ctx.moveTo(fx2,fy2-4); ctx.lineTo(f.tx,f.ty); ctx.stroke();
@@ -1683,6 +1724,7 @@ function drawHUD(){
   if(p&&p.stars>0) extra+='<span>⭐×'+p.stars+'</span>';
   if(p&&p.bubbles>0) extra+='<span>🫧×'+p.bubbles+'</span>';
   if(p&&p.drillT>0) extra+='<span>⛏️'+Math.ceil(p.drillT)+'</span>';
+  if(skate&&skate.state==='ride') extra+='<span>🛹</span>';
   if(wonderT>0) extra+='<span>🌸'+Math.ceil(wonderT)+'</span>';
   if(warpT>0) extra+='<span>🚪'+Math.ceil(warpT)+'</span>';
   if(!rushMode) extra+='<span style="color:#9fb6d4">⏱'+fmtT(levelT)+'</span>';
