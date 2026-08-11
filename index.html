@@ -166,7 +166,7 @@
 </div>
 
 <script>
-const APP_VERSION='v26';
+const APP_VERSION='v27';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -727,7 +727,7 @@ function buildLevel(idx, defO){
   H=13+SKY; W=def.W; grid=Array.from({length:H},()=>new Array(W).fill(0));
   coins=[]; enemies=[]; spikes=[]; projectiles=[]; boxes=[]; presents=[]; toasts=[];
   springs=[]; movers=[]; gems=[]; checkpoint=null; wonder=null; wonderT=0; wonderFx=null; gMul=1;
-  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null; cannons=[]; skate=null; flips=[]; flipCd=0;
+  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null; cannons=[]; skate=null; flips=[]; flipCd=0; pet=null;
   const GT=10;                     // ground-top row (build-space)
   const api={
     ground(pits){ const isPit=x=>pits&&pits.some(([a,b])=>x>=a&&x<=b);
@@ -793,6 +793,9 @@ function buildLevel(idx, defO){
       tx=cand; break; }
     if(tx>=0){ usedCols.push(tx-1,tx,tx+1);
       skate={x:tx*TILE+4, y:floorRow(tx)*TILE-10, state:'idle', spinT:0}; } }
+  { const tx=safeCol(Math.round(W*0.25),usedCols);                                // 🐣 the pet waits to be found
+    if(tx>=0){ usedCols.push(tx-1,tx,tx+1);
+      pet={x:tx*TILE+16, y:floorRow(tx)*TILE-12, cd:0, bob:Math.random()*6, state:'wait'}; } }
   { const tx=safeCol(Math.round(W*0.18),usedCols);                                // 🐸 frog mount waits early on
     if(tx>=0){ usedCols.push(tx-1,tx,tx+1);
       frog={x:tx*TILE+7, y:floorRow(tx)*TILE-24, w:26, h:24, vx:0, vy:0, state:'idle', hopT:2, dir:1, fleeT:0, tongueT:0.8, tx:0, ty:0, tShow:0, onG:false}; } }
@@ -874,7 +877,7 @@ function buildCustomLevel(){
   W=ED_W; H=13+SKY; grid=Array.from({length:H},()=>new Array(W).fill(0));
   coins=[]; enemies=[]; spikes=[]; projectiles=[]; boxes=[]; presents=[]; toasts=[];
   springs=[]; movers=[]; gems=[]; checkpoint=null; wonder=null; wonderT=0; wonderFx=null; gMul=1;
-  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null; cannons=[]; skate=null; flips=[]; flipCd=0; ghostPlay=null; rival=null; wx=null;
+  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null; cannons=[]; skate=null; flips=[]; flipCd=0; pet=null; ghostPlay=null; rival=null; wx=null;
   chaosFx=null; chaosG=1;
   for(let y=0;y<ED_H;y++) for(let x=0;x<W;x++){ const ch=editRows[y][x];
     if(ch==='#') grid[y][x]=1;
@@ -947,7 +950,7 @@ function buildRushArena(i){
   W=44; H=13+SKY; grid=Array.from({length:H},()=>new Array(W).fill(0));
   coins=[]; enemies=[]; spikes=[]; projectiles=[]; boxes=[]; presents=[]; toasts=[];
   springs=[]; movers=[]; gems=[]; checkpoint=null; wonder=null; wonderT=0; wonderFx=null; gMul=1;
-  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null; cannons=[]; skate=null; flips=[]; flipCd=0; remixOn=false; ghostPlay=null; dailyMode=false;
+  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null; cannons=[]; skate=null; flips=[]; flipCd=0; pet=null; remixOn=false; ghostPlay=null; dailyMode=false;
   chaosFx=null; chaosG=1;
   initWX(def.name);
   for(let x=0;x<W;x++) for(let y=GT;y<13;y++) grid[y+SKY][x]=1;         // solid floor, no pits
@@ -979,7 +982,6 @@ function resetPlayer(){
       shieldT:0, wantBig:false, big:false, stars:0, shootFlash:0, drillT:0, bubbles:0, blastT:0, jetT:0, jetFlame:0, frogHop:false };
   if(hatIs('cap')) p.stars=3;
   if(hatIs('crown')) p.shieldT=5;
-  pet={ x:startPx.x-24, y:startPx.y, cd:0, bob:Math.random()*6 };
   maxHearts=3+(has('heart')?1:0); hearts=maxHearts; coinsGot=0;
   cam={x:0,y:Math.max(0,H*TILE-VH)};   // start looking at the ground, not the empty sky
 }
@@ -1358,7 +1360,11 @@ function update(dt){
     }
   }
   // pet buddy — follows, scoops nearby coins, recharges its guardian save
-  if(pet){ pet.bob+=dt; if(pet.cd>0) pet.cd-=dt*(hatIs('party')?2:1);
+  if(pet && pet.state==='wait'){ pet.bob+=dt;
+    if(pl.hurt<=0 && Math.abs(pl.x+pl.w/2-pet.x)<28 && Math.abs(pl.y+pl.h/2-pet.y)<36){
+      pet.state='follow'; sfx('power');
+      toasts.push({x:pet.x, y:pet.y-22, ic:shopState.pet==='dragon'?'🐲':shopState.pet==='puppy'?'🐶':'🐣', t:1.3}); } }
+  else if(pet){ pet.bob+=dt; if(pet.cd>0) pet.cd-=dt*(hatIs('party')?2:1);
     const tx2=pl.x+pl.w/2-pl.face*34, ty2=pl.y+pl.h/2-14+Math.sin(pet.bob*3)*5;
     pet.x+=(tx2-pet.x)*Math.min(1,dt*5); pet.y+=(ty2-pet.y)*Math.min(1,dt*5);
     const grabR=shopState.pet==='puppy'?44:26;
@@ -1430,7 +1436,7 @@ function hitPlayer(){ if(p.hurt>0) return;
   if(skate && skate.state==='ride'){ addPop(skate.x+16,skate.y);   // the board breaks instead
     toasts.push({x:skate.x+16,y:skate.y-14,ic:'🛹💥',t:1.2}); skate=null;
     p.hurt=1.1; p.vy=-260; sfx('hurt'); return; }
-  if(pet && pet.cd<=0){ pet.cd=20; p.hurt=1.1; sfx('shield');   // pet bravely blocks the hit
+  if(pet && pet.state==='follow' && pet.cd<=0){ pet.cd=20; p.hurt=1.1; sfx('shield');   // pet bravely blocks the hit
     addPop(pet.x,pet.y); toasts.push({x:pet.x,y:pet.y-18,ic:'🐣',t:1.2}); return; }
   if(p.big||p.wantBig){ p.wantBig=false; p.hurt=1.1; p.vy=-320; p.vx=-p.face*260; sfx('hurt'); return; }  // lose your size, not a heart
   hearts--; p.hurt=1.1; p.vy=-320; p.vx=-p.face*260; sfx('hurt'); if(hearts<=0) startDeath(); }
@@ -1441,7 +1447,7 @@ function respawnAtCheckpoint(){ // hearts refill; coins, gems and defeated enemi
   p={ x:checkpoint.x-6, y:checkpoint.y-34, w:SMALLW, h:SMALLH, vx:0, vy:0, onGround:false, face:1,
       jumps:0, coyote:0, jumpBuf:0, dashCd:0, dashT:0, pounding:false, trail:[], hurt:1.2, anim:0,
       shieldT:0, wantBig:false, big:false, stars:0, shootFlash:0, drillT:0, bubbles:0, blastT:0, jetT:0, jetFlame:0, frogHop:false };
-  pet={ x:p.x-24, y:p.y, cd:0, bob:0 };
+  if(pet&&pet.state==='follow'){ pet.x=p.x-24; pet.y=p.y; }   // a found pet stays with you this level
   hearts=maxHearts; gMul=chaosG; wonderT=0; wonderFx=null;
   if(chaosFx==='tiny'){ p.w=14; p.h=20; p.y+=10; }
   if(chaosFx==='oneheart'){ maxHearts=1; hearts=1; }
@@ -1921,7 +1927,9 @@ function drawFrog(){ const f=frog, fx2=f.x+13, fy2=f.y+12;
   ctx.strokeStyle='#2a7a42'; ctx.lineWidth=1.6; ctx.beginPath(); ctx.arc(fx2,fy2+3,5,0.15*Math.PI,0.85*Math.PI); ctx.stroke();
   if(f.state==='idle' && Math.floor(performance.now()/900)%3===0){ ctx.fillStyle='rgba(255,255,255,.9)'; ctx.font='10px sans-serif'; ctx.textAlign='center'; ctx.fillText('ribbit',fx2,f.y-8); }
 }
-function drawPet(){ const px=pet.x, py=pet.y, rdy=pet.cd<=0, skin=shopState.pet;
+function drawPet(){ const px=pet.x, py=pet.y+(pet.state==='wait'?Math.abs(Math.sin(pet.bob*4))*-6:0), rdy=pet.cd<=0, skin=shopState.pet;
+  if(pet.state==='wait' && Math.floor(performance.now()/600)%2===0){
+    ctx.fillStyle='rgba(255,255,255,.95)'; ctx.font='bold 13px sans-serif'; ctx.textAlign='center'; ctx.fillText('!',pet.x,pet.y-22); }
   ctx.save(); ctx.globalAlpha=rdy?1:0.55;
   ctx.fillStyle='rgba(0,0,0,.12)'; ctx.beginPath(); ctx.ellipse(px,py+13,8,2.6,0,0,7); ctx.fill();
   const flap=Math.abs(Math.sin(performance.now()/110))*4;
