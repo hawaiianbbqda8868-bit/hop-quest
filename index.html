@@ -149,7 +149,7 @@
 </div>
 
 <script>
-const APP_VERSION='v21';
+const APP_VERSION='v22';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -955,8 +955,9 @@ function update(dt){
   const canJump = pl.onGround || pl.coyote>0 || (has('double') && pl.jumps<2 && pl.jumps>0);
   const jm=(pl.big?1.35:1)*(frog&&frog.state==='ride'?1.28:1);   // giant hero and frog riders jump much higher
   if(pl.jumpBuf>0){
-    if(pl.onGround||pl.coyote>0){ pl.vy=-(JUMP*(has('highjump')?1.3:1)*jm); pl.jumps=1; pl.jumpBuf=0; pl.coyote=0; pl.onGround=false; if(riding) skate.spinT=0.45; }
-    else if(has('double') && pl.jumps===1){ pl.vy=-(JUMP*(has('highjump')?1.28:1.1)*jm); pl.jumps=2; pl.jumpBuf=0; if(riding) skate.spinT=0.45; }
+    const frogBound=()=>{ if(frog&&frog.state==='ride'){ pl.vx=pl.face*430; pl.blastT=2; } };   // frogs leap FORWARD
+    if(pl.onGround||pl.coyote>0){ pl.vy=-(JUMP*(has('highjump')?1.3:1)*jm); pl.jumps=1; pl.jumpBuf=0; pl.coyote=0; pl.onGround=false; if(riding) skate.spinT=0.45; frogBound(); }
+    else if(has('double') && pl.jumps===1){ pl.vy=-(JUMP*(has('highjump')?1.28:1.1)*jm); pl.jumps=2; pl.jumpBuf=0; if(riding) skate.spinT=0.45; frogBound(); }
   }
   // variable jump height (release early = shorter)
   const hg=hatIs('astro')?0.92:1;   // moon boots
