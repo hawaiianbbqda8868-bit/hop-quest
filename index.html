@@ -87,6 +87,9 @@
   <div class="row" style="margin-top:6px">
     <button class="chip" id="edPanL">◀◀ pan</button>
     <button class="chip" id="edPanR">pan ▶▶</button>
+    <button class="chip" id="edPanU">▲ sky</button>
+    <button class="chip" id="edPanD">▼ ground</button>
+    <button class="chip" id="edRand">🎲 Random</button>
     <button class="chip sel" id="edTest">▶ TEST</button>
     <button class="chip" id="edExit">💾 Menu</button>
   </div>
@@ -163,7 +166,7 @@
 </div>
 
 <script>
-const APP_VERSION='v23';
+const APP_VERSION='v24';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -830,9 +833,12 @@ function buildLevel(idx, defO){
 const ED_W=120;
 let editMode=false, customMode=false, brush='#', editRows=null;
 const BRUSHES=[['#','🟫 Ground'],['=','🟧 Platform'],['c','🪙 Coin'],['e','🟣 Walker'],['f','🦋 Flyer'],['j','🐸 Jumper'],['s','🔫 Shooter'],['h','😠 Chaser'],['^','🔺 Spike'],['S','🔴 Spring'],['b','🎁 Box'],['.','❌ Erase']];
+const ED_H=13+SKY;   // full playfield including the 8 sky rows
 function loadCustom(){ try{ const s4=localStorage.getItem('hopCustom');
-    if(s4){ const rows=s4.split('\n').map(r=>r.split('')); if(rows.length===13) return rows; } }catch(e){}
-  return Array.from({length:13},(_,y)=>new Array(ED_W).fill(y>=10?'#':'.')); }
+    if(s4){ const rows=s4.split('\n').map(r=>r.split(''));
+      if(rows.length===ED_H) return rows;
+      if(rows.length===13){ const skyRows=Array.from({length:SKY},()=>new Array(ED_W).fill('.')); return skyRows.concat(rows); } } }catch(e){}
+  return Array.from({length:ED_H},(_,y)=>new Array(ED_W).fill(y>=10+SKY?'#':'.')); }
 function saveCustom(){ try{ localStorage.setItem('hopCustom', editRows.map(r=>r.join('')).join('\n')); }catch(e){} }
 function hasCustom(){ try{ return !!localStorage.getItem('hopCustom'); }catch(e){ return false; } }
 function buildCustomLevel(){
@@ -841,24 +847,46 @@ function buildCustomLevel(){
   coins=[]; enemies=[]; spikes=[]; projectiles=[]; boxes=[]; presents=[]; toasts=[];
   springs=[]; movers=[]; gems=[]; checkpoint=null; wonder=null; wonderT=0; wonderFx=null; gMul=1;
   doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null; cannons=[]; skate=null; ghostPlay=null; rival=null; wx=null;
-  for(let y=0;y<13;y++) for(let x=0;x<W;x++){ const ch=editRows[y][x];
-    if(ch==='#') grid[y+SKY][x]=1;
-    else if(ch==='=') grid[y+SKY][x]=2;
-    else if(ch==='c') coins.push({x:x*TILE+TILE/2, y:(y+SKY)*TILE+TILE/2, got:false});
-    else if(ch==='e') enemies.push({type:'walk', x:x*TILE, y:(y+SKY)*TILE-2, w:30,h:30, vx:60,vy:0, dir:-1, alive:true, stun:0});
-    else if(ch==='f') enemies.push({type:'fly', x:x*TILE, y:(y+SKY)*TILE, w:32,h:24, vx:80,vy:0, dir:-1, alive:true, stun:0, baseY:(y+SKY)*TILE, phase:x*0.7});
-    else if(ch==='j') enemies.push({type:'jump', x:x*TILE, y:(y+SKY)*TILE-2, w:30,h:30, vx:45,vy:0, dir:-1, alive:true, stun:0, t:(x%3)*0.4, onGround:false});
-    else if(ch==='s') enemies.push({type:'shoot', x:x*TILE, y:(y+SKY)*TILE-2, w:30,h:32, vx:0,vy:0, dir:-1, alive:true, stun:0, t:1.4, onGround:false});
-    else if(ch==='h') enemies.push({type:'chase', x:x*TILE, y:(y+SKY)*TILE-2, w:30,h:30, vx:60,vy:0, dir:-1, alive:true, stun:0, chasing:false, onGround:false});
-    else if(ch==='^') spikes.push({x:x*TILE, y:(y+1+SKY)*TILE});
-    else if(ch==='S') springs.push({x:x*TILE+4, y:(y+1+SKY)*TILE-14, w:TILE-8, h:14, t:0});
-    else if(ch==='b') boxes.push({x:x*TILE+4, y:(y+SKY)*TILE+4, w:32, h:36, open:false});
+  for(let y=0;y<ED_H;y++) for(let x=0;x<W;x++){ const ch=editRows[y][x];
+    if(ch==='#') grid[y][x]=1;
+    else if(ch==='=') grid[y][x]=2;
+    else if(ch==='c') coins.push({x:x*TILE+TILE/2, y:y*TILE+TILE/2, got:false});
+    else if(ch==='e') enemies.push({type:'walk', x:x*TILE, y:y*TILE-2, w:30,h:30, vx:60,vy:0, dir:-1, alive:true, stun:0});
+    else if(ch==='f') enemies.push({type:'fly', x:x*TILE, y:y*TILE, w:32,h:24, vx:80,vy:0, dir:-1, alive:true, stun:0, baseY:y*TILE, phase:x*0.7});
+    else if(ch==='j') enemies.push({type:'jump', x:x*TILE, y:y*TILE-2, w:30,h:30, vx:45,vy:0, dir:-1, alive:true, stun:0, t:(x%3)*0.4, onGround:false});
+    else if(ch==='s') enemies.push({type:'shoot', x:x*TILE, y:y*TILE-2, w:30,h:32, vx:0,vy:0, dir:-1, alive:true, stun:0, t:1.4, onGround:false});
+    else if(ch==='h') enemies.push({type:'chase', x:x*TILE, y:y*TILE-2, w:30,h:30, vx:60,vy:0, dir:-1, alive:true, stun:0, chasing:false, onGround:false});
+    else if(ch==='^') spikes.push({x:x*TILE, y:(y+1)*TILE});
+    else if(ch==='S') springs.push({x:x*TILE+4, y:(y+1)*TILE-14, w:TILE-8, h:14, t:0});
+    else if(ch==='b') boxes.push({x:x*TILE+4, y:y*TILE+4, w:32, h:36, open:false});
   }
-  for(let x=0;x<5;x++) for(let y=10;y<13;y++) grid[y+SKY][x]=1;        // guaranteed start ground
-  for(let x=W-7;x<W;x++) for(let y=10;y<13;y++) grid[y+SKY][x]=1;      // guaranteed flag ground
+  for(let x=0;x<5;x++) for(let y=10+SKY;y<13+SKY;y++) grid[y][x]=1;        // guaranteed start ground
+  for(let x=W-7;x<W;x++) for(let y=10+SKY;y<13+SKY;y++) grid[y][x]=1;      // guaranteed flag ground
   boss=null;
   flag={ x:(W-4)*TILE, top:(10+SKY)*TILE - TILE*6, h:TILE*6 };
   startPx={ x:2*TILE, y:(10+SKY)*TILE-40 };
+}
+function edRandom(){   // 🎲 fill the canvas with a generated world to edit from
+  const R=Math.random, rows=Array.from({length:ED_H},(_,y)=>new Array(ED_W).fill(y>=10+SKY?'#':'.'));
+  const gnd=10+SKY, pits=[];
+  let x=12+((R()*6)|0);
+  while(x<ED_W-16){ const pw=2+((R()*2)|0); pits.push([x,x+pw-1]);
+    for(let c2=x;c2<x+pw;c2++) for(let y=gnd;y<ED_H;y++) rows[y][c2]='.';
+    x+=12+((R()*12)|0); }
+  const inPit=c2=>pits.some(([a,b])=>c2>=a-1&&c2<=b+1);
+  x=7;
+  while(x<ED_W-12){ const py=gnd-2-((R()*5)|0), w2=3+((R()*3)|0);
+    for(let k=0;k<w2&&x+k<ED_W-8;k++){ rows[py][x+k]='='; if(R()<0.75) rows[py-1][x+k]='c'; }
+    if(R()<0.35) rows[py-1][x+((R()*w2)|0)]='b';
+    if(R()<0.6){ const ex=x+2+((R()*5)|0); if(!inPit(ex)&&ex<ED_W-8&&rows[gnd-1][ex]==='.') rows[gnd-1][ex]='efjsh'[(R()*5)|0]; }
+    if(R()<0.3){ const sx2=x+((R()*8)|0); if(!inPit(sx2)&&sx2<ED_W-8&&rows[gnd-1][sx2]==='.') rows[gnd-1][sx2]='^'; }
+    if(R()<0.25){ const spx=x-2; if(spx>5&&!inPit(spx)&&rows[gnd-1][spx]==='.') rows[gnd-1][spx]='S'; }
+    x+=6+((R()*7)|0); }
+  for(let k=0;k<8;k++){ const sx3=20+k*11, sy3=2+((R()*4)|0);   // a sky route to remodel
+    for(let j=0;j<3;j++) if(sx3+j<ED_W-8) rows[sy3][sx3+j]='=';
+    if(R()<0.8) rows[sy3-1][sx3+1]='c'; }
+  editRows=rows; saveCustom();
+  const cx0=cam.x, cy0=cam.y; buildCustomLevel(); p=null; pet=null; cam={x:cx0,y:cy0};
 }
 function openEditor(){ editRows=loadCustom(); editMode=true; customMode=false; rushMode=false; dailyMode=false; remixOn=false;
   state='edit'; hideOverlays(); document.getElementById('editBar').classList.remove('hidden');
@@ -875,8 +903,8 @@ addEventListener('pointermove',e=>{ if(editMode&&editPaint) edPaintAt(e); });
 addEventListener('pointerup',()=>editPaint=false);
 function edPaintAt(e){ const r=cv.getBoundingClientRect();
   const wx3=(e.clientX-r.left)*(VW/r.width)+cam.x, wy3=(e.clientY-r.top)*(VH/r.height)+cam.y;
-  const tx=Math.floor(wx3/TILE), ty=Math.floor(wy3/TILE)-SKY;
-  if(tx<0||tx>=ED_W||ty<0||ty>12) return;
+  const tx=Math.floor(wx3/TILE), ty=Math.floor(wy3/TILE);
+  if(tx<0||tx>=ED_W||ty<0||ty>=ED_H) return;
   if(editRows[ty][tx]===brush) return;
   editRows[ty][tx]=brush; saveCustom(); const cx0=cam.x, cy0=cam.y; buildCustomLevel(); p=null; pet=null; cam={x:cx0,y:cy0}; }
 // ---------- boss rush ----------
@@ -1965,6 +1993,9 @@ BRUSHES.forEach(([ch,label])=>{ const d=document.createElement('button'); d.clas
   d.onclick=()=>{ brush=ch; [...brushRowEl.children].forEach(x=>x.classList.toggle('sel',x===d)); }; brushRowEl.appendChild(d); });
 document.getElementById('edPanL').onclick=()=>{ cam.x=Math.max(0,cam.x-TILE*6); };
 document.getElementById('edPanR').onclick=()=>{ cam.x=Math.min(ED_W*TILE-VW,cam.x+TILE*6); };
+document.getElementById('edPanU').onclick=()=>{ cam.y=Math.max(0,cam.y-TILE*4); };
+document.getElementById('edPanD').onclick=()=>{ cam.y=Math.min(ED_H*TILE-VH,cam.y+TILE*4); };
+document.getElementById('edRand').onclick=()=>{ if(editMode) edRandom(); };
 document.getElementById('edTest').onclick=()=>closeEditor(true);
 document.getElementById('edExit').onclick=()=>closeEditor(false);
 document.getElementById('rushBtn').onclick=()=>{ saveHero(); startRush(); };
