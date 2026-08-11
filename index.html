@@ -90,13 +90,14 @@
   <div class="card">
     <div class="lbl">Level — pick where to start</div>
     <div class="row" id="levels"></div>
+    <div class="row" style="margin-top:8px"><button class="chip" id="remixTog">🔀 Remix: OFF</button></div>
   </div>
   <div class="card">
     <div class="lbl">Color</div>
     <div class="row" id="colors"></div>
   </div>
   <div class="card">
-    <div class="lbl">Hat</div>
+    <div class="lbl">Hat — each one has a power!</div>
     <div class="row" id="hats"></div>
   </div>
   <div class="card">
@@ -136,17 +137,17 @@
 </div>
 
 <script>
-const APP_VERSION='v16';
+const APP_VERSION='v17';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
 
 // ---------- customization ----------
 const COLORS=['#ff6b6b','#ff9d3a','#ffd54a','#5fe08a','#46c8ff','#7c8cff','#c77dff','#ff7ad1'];
-const HATS=[{id:'none',ic:'∅',nm:'None'},{id:'cap',ic:'🧢',nm:'Cap'},{id:'crown',ic:'👑',nm:'Crown'},{id:'party',ic:'🎉',nm:'Party'},{id:'horn',ic:'🦄',nm:'Horn'},
-  {id:'wiz',ic:'🧙',nm:'Wizard',lock:()=>totalGems()>=15,hint:'15 💎'},
-  {id:'astro',ic:'🚀',nm:'Astronaut',lock:()=>goldCount()>=5,hint:'5 🥇'},
-  {id:'pirate',ic:'🏴‍☠️',nm:'Pirate',lock:()=>rushBest()>=11,hint:'Rush 11 👑'}];
+const HATS=[{id:'none',ic:'∅',nm:'None'},{id:'cap',ic:'🧢',nm:'Cap',pw:'+3⭐ start'},{id:'crown',ic:'👑',nm:'Crown',pw:'5s 🛡️ start'},{id:'party',ic:'🎉',nm:'Party',pw:'fast 🐣'},{id:'horn',ic:'🦄',nm:'Horn',pw:'super springs'},
+  {id:'wiz',ic:'🧙',nm:'Wizard',pw:'piercing ⭐',lock:()=>totalGems()>=15,hint:'15 💎'},
+  {id:'astro',ic:'🚀',nm:'Astronaut',pw:'moon boots',lock:()=>goldCount()>=5,hint:'5 🥇'},
+  {id:'pirate',ic:'🏴‍☠️',nm:'Pirate',pw:'enemy 🪙 loot',lock:()=>rushBest()>=11,hint:'Rush 11 👑'}];
 function hatOpen(h){ return !h.lock || h.lock(); }
 const ABILITIES=[
   {id:'double', ic:'🪽', nm:'Double Jump', de:'Jump again in mid-air', cost:1},
@@ -160,8 +161,8 @@ const ABILITIES=[
 const BUDGET=3;
 let sel={ color:COLORS[3], hat:'cap', abil:new Set(['double']) };
 let menuLevel=0;
-try{ const s=JSON.parse(localStorage.getItem('hopHero')||'null'); if(s){ sel.color=s.color||sel.color; sel.hat=s.hat||sel.hat; sel.abil=new Set(s.abil||['double']); if(typeof s.level==='number') menuLevel=s.level; } }catch(e){}
-function saveHero(){ try{ localStorage.setItem('hopHero', JSON.stringify({color:sel.color,hat:sel.hat,abil:[...sel.abil],level:menuLevel})); }catch(e){} }
+try{ const s=JSON.parse(localStorage.getItem('hopHero')||'null'); if(s){ sel.color=s.color||sel.color; sel.hat=s.hat||sel.hat; sel.abil=new Set(s.abil||['double']); if(typeof s.level==='number') menuLevel=s.level; sel.remix=!!s.remix; } }catch(e){}
+function saveHero(){ try{ localStorage.setItem('hopHero', JSON.stringify({color:sel.color,hat:sel.hat,abil:[...sel.abil],level:menuLevel,remix:!!sel.remix})); }catch(e){} }
 function has(a){ return sel.abil.has(a); }
 
 // ---------- levels ----------
@@ -171,6 +172,14 @@ let springs, movers, gems, checkpoint, wonder;          // auto-placed per level
 let wonderT=0, wonderFx=null, gMul=1;                   // wonder-flower effect state
 let rushMode=false, rushIdx=0, rushT=0, rushAdv=false;  // 👑 boss rush state
 let pet=null;                                           // 🐣 buddy: follows, grabs coins, blocks one hit
+let frog=null;                                          // 🐸 rideable mount
+let remixOn=false;                                      // 🔀 mirrored+spicier levels
+let ghostRec=[], ghostPlay=null, recT=0;                // 👻 best-run ghost
+let ghostStoreObj={};
+try{ ghostStoreObj=JSON.parse(localStorage.getItem('hopGhosts')||'{}')||{}; }catch(e){}
+function saveGhosts(){ try{ localStorage.setItem('hopGhosts', JSON.stringify(ghostStoreObj)); }catch(e){} }
+const hatIs=id=>sel.hat===id;
+function dropLoot(en){ if(hatIs('pirate')) coins.push({x:en.x+en.w/2, y:en.y-4, got:false}); }
 let doorA=null, doorB=null, warpT=0, warpCd=0;          // 🚪 warp door + coin vault
 let levelT=0;                                           // ⏱ time attack clock
 let timeStore={};                                       // best times per level
@@ -622,7 +631,7 @@ function buildLevel(idx){
   H=13+SKY; W=def.W; grid=Array.from({length:H},()=>new Array(W).fill(0));
   coins=[]; enemies=[]; spikes=[]; projectiles=[]; boxes=[]; presents=[]; toasts=[];
   springs=[]; movers=[]; gems=[]; checkpoint=null; wonder=null; wonderT=0; wonderFx=null; gMul=1;
-  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0;
+  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null;
   const GT=10;                     // ground-top row (build-space)
   const api={
     ground(pits){ const isPit=x=>pits&&pits.some(([a,b])=>x>=a&&x<=b);
@@ -640,6 +649,13 @@ function buildLevel(idx){
     box(x,y){ boxes.push({x:x*TILE+4, y:(y+SKY)*TILE+4, w:32, h:36, open:false}); },
   };
   def.build(api);
+  if(remixOn){ const WT=W*TILE;               // 🔀 mirror the hand-built layout; auto features adapt below
+    grid.forEach((row,ri)=>grid[ri]=row.slice().reverse());
+    coins.forEach(c=>c.x=WT-c.x);
+    enemies.forEach(en=>{ en.x=WT-en.x-en.w; });
+    spikes.forEach(s=>s.x=WT-s.x-TILE);
+    boxes.forEach(b=>b.x=WT-b.x-b.w);
+  }
   // ---- auto-placed features: every level gets springs, movers, a checkpoint, gems + a wonder flower ----
   const floorRow=tx=>{ for(let r=H-1;r>=SKY;r--){ if(grid[r][tx] && !(r>0&&grid[r-1][tx])) return r; } return -1; };
   const clearOfStuff=tx=>!spikes.some(s=>Math.abs(s.x/TILE-tx)<2)&&!boxes.some(b=>Math.abs(b.x/TILE-tx)<2)&&!enemies.some(e=>e.type==='shoot'&&Math.abs(e.x/TILE-tx)<2);
@@ -647,6 +663,9 @@ function buildLevel(idx){
   const usedCols=[];
   for(const fr of [0.3,0.65]){ const tx=safeCol(Math.round(W*fr),usedCols);       // bounce springs
     if(tx>=0){ usedCols.push(tx-1,tx,tx+1); const r=floorRow(tx); springs.push({x:tx*TILE+4,y:r*TILE-14,w:TILE-8,h:14,t:0}); } }
+  { const tx=safeCol(Math.round(W*0.18),usedCols);                                // 🐸 frog mount waits early on
+    if(tx>=0){ usedCols.push(tx-1,tx,tx+1);
+      frog={x:tx*TILE+7, y:floorRow(tx)*TILE-24, w:26, h:24, vx:0, vy:0, state:'idle', hopT:2, dir:1, fleeT:0, tongueT:0.8, tx:0, ty:0, tShow:0, onG:false}; } }
   { const tx=safeCol(Math.round(W*0.5),usedCols);                                 // mid-level checkpoint
     if(tx>=0){ usedCols.push(tx-1,tx,tx+1); checkpoint={x:tx*TILE+10,y:floorRow(tx)*TILE,active:false}; } }
   { const pits=[]; let a=-1;                                                      // movers patrol the two widest pits
@@ -680,18 +699,25 @@ function buildLevel(idx){
     if(!spot){ const tx=safeCol(Math.round(W*0.55),usedCols); if(tx>=0) spot=[floorRow(tx),tx]; }
     if(spot) wonder={x:spot[1]*TILE+TILE/2,y:spot[0]*TILE-24,used:false};
   }
+  // start & flag columns — remix re-derives them from the mirrored floor instead of per-level overrides
+  let fxc=def.flagX!=null?def.flagX:(W-4), ftc=def.flagTop!=null?def.flagTop:GT;
+  let sxc=def.startX!=null?def.startX:2, stc=def.startTop!=null?def.startTop:GT;
+  if(remixOn){
+    fxc=W-4; for(let tx=W-4;tx>W*0.7;tx--){ if(floorRow(tx)>=0){ fxc=tx; break; } }
+    if(floorRow(fxc)>=0) ftc=floorRow(fxc)-SKY;
+    sxc=2; for(let tx=2;tx<W*0.3;tx++){ if(floorRow(tx)>=0){ sxc=tx; break; } }
+    if(floorRow(sxc)>=0) stc=floorRow(sxc)-SKY;
+  }
   boss=null;
   if(def.boss){
-    const cfg=def.boss, fxc=def.flagX!=null?def.flagX:(W-4), ftc=def.flagTop!=null?def.flagTop:GT;
+    const cfg=def.boss;
     const big=cfg.hp>=6, bw=big?76:60, bh=big?66:52;
-    boss={ x:(cfg.x!=null?cfg.x:fxc-2)*TILE, y:(ftc+SKY)*TILE-bh, w:bw, h:bh,
+    boss={ x:(cfg.x!=null&&!remixOn?cfg.x:fxc-2)*TILE, y:(ftc+SKY)*TILE-bh, w:bw, h:bh,
            hp:cfg.hp, maxHp:cfg.hp, nm:cfg.nm, col:cfg.col, shots:cfg.shots, hop:cfg.hop||(big?140:110),
            active:false, alive:true, vx:0, vy:0, onGround:false, hopT:1.2, shotT:4, inv:0, face:-1 };
   }
-  const fx=def.flagX!=null?def.flagX:(W-4), ft=(def.flagTop!=null?def.flagTop:GT)+SKY;
-  flag={ x:fx*TILE, top:ft*TILE - TILE*6, h:TILE*6 };
-  const sx=def.startX!=null?def.startX:2, st=(def.startTop!=null?def.startTop:GT)+SKY;
-  startPx={ x:sx*TILE, y:st*TILE-40 };
+  flag={ x:fxc*TILE, top:(ftc+SKY)*TILE - TILE*6, h:TILE*6 };
+  startPx={ x:sxc*TILE, y:(stc+SKY)*TILE-40 };
 }
 // ---------- boss rush ----------
 function rushBest(){ return +(localStorage.getItem('hopRushBest')||0); }
@@ -702,7 +728,7 @@ function buildRushArena(i){
   W=44; H=13+SKY; grid=Array.from({length:H},()=>new Array(W).fill(0));
   coins=[]; enemies=[]; spikes=[]; projectiles=[]; boxes=[]; presents=[]; toasts=[];
   springs=[]; movers=[]; gems=[]; checkpoint=null; wonder=null; wonderT=0; wonderFx=null; gMul=1;
-  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0;
+  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null; remixOn=false; ghostPlay=null;
   for(let x=0;x<W;x++) for(let y=GT;y<13;y++) grid[y+SKY][x]=1;         // solid floor, no pits
   const lay=[[[6,7,3],[14,5,3],[35,7,3]],[[8,6,3],[20,4,3],[32,6,3]],[[5,7,3],[22,5,4],[37,7,3]]][i%3];
   lay.forEach(([x,y,w])=>{ for(let k=0;k<w;k++) grid[y+SKY][x+k]=2; }); // a few hop platforms
@@ -729,11 +755,16 @@ function resetPlayer(){
   p={ x:startPx.x, y:startPx.y, w:24, h:30, vx:0, vy:0, onGround:false, face:1,
       jumps:0, coyote:0, jumpBuf:0, dashCd:0, dashT:0, pounding:false, trail:[], hurt:0, anim:0,
       shieldT:0, wantBig:false, big:false, stars:0, shootFlash:0, drillT:0, bubbles:0 };
+  if(hatIs('cap')) p.stars=3;
+  if(hatIs('crown')) p.shieldT=5;
   pet={ x:startPx.x-24, y:startPx.y, cd:0, bob:Math.random()*6 };
   maxHearts=3+(has('heart')?1:0); hearts=maxHearts; coinsGot=0;
   cam={x:0,y:Math.max(0,H*TILE-VH)};   // start looking at the ground, not the empty sky
 }
-function startGame(idx){ rushMode=false; if(idx==null) idx=menuLevel; menuLevel=((idx%LEVELS.length)+LEVELS.length)%LEVELS.length; saveHero(); buildLevel(menuLevel); resetPlayer(); state='play'; winFlash=0; deathTimer=0; hideOverlays(); setTrack(LEVELS[menuLevel].music||'cheery'); }
+function startGame(idx){ rushMode=false; remixOn=!!sel.remix; if(idx==null) idx=menuLevel; menuLevel=((idx%LEVELS.length)+LEVELS.length)%LEVELS.length; saveHero(); buildLevel(menuLevel);
+  if(remixOn) curName+=' 🔀';
+  ghostPlay=(!remixOn&&ghostStoreObj[menuLevel])||null; ghostRec=[]; recT=0;
+  resetPlayer(); state='play'; winFlash=0; deathTimer=0; hideOverlays(); setTrack(LEVELS[menuLevel].music||'cheery'); }
 
 // ---------- input ----------
 const keys={left:false,right:false,jump:false,jumpEdge:false,act:false,actEdge:false};
@@ -817,15 +848,16 @@ function update(dt){
           if(grid[ty]&&grid[ty][tx]===2){ grid[ty][tx]=0; addPop(tx*TILE+TILE/2,ty*TILE); sfx('stomp'); } } } }
   // jump
   const canJump = pl.onGround || pl.coyote>0 || (has('double') && pl.jumps<2 && pl.jumps>0);
-  const jm=pl.big?1.35:1;   // giant hero jumps much higher
+  const jm=(pl.big?1.35:1)*(frog&&frog.state==='ride'?1.28:1);   // giant hero and frog riders jump much higher
   if(pl.jumpBuf>0){
     if(pl.onGround||pl.coyote>0){ pl.vy=-(JUMP*(has('highjump')?1.3:1)*jm); pl.jumps=1; pl.jumpBuf=0; pl.coyote=0; pl.onGround=false; }
     else if(has('double') && pl.jumps===1){ pl.vy=-(JUMP*(has('highjump')?1.28:1.1)*jm); pl.jumps=2; pl.jumpBuf=0; }
   }
   // variable jump height (release early = shorter)
-  if(!keys.jump && pl.vy<0) pl.vy+=G*gMul*1.6*dt;
+  const hg=hatIs('astro')?0.92:1;   // moon boots
+  if(!keys.jump && pl.vy<0) pl.vy+=G*gMul*hg*1.6*dt;
   // gravity + glide (gMul drops during the low-gravity wonder effect)
-  pl.vy+=G*gMul*dt;
+  pl.vy+=G*gMul*hg*dt;
   if(has('glide') && keys.jump && pl.vy>0 && !pl.pounding) pl.vy=Math.min(pl.vy,GLIDE);
   pl.vy=Math.min(pl.vy,MAXFALL + (pl.pounding?600:0));
   // integrate with tile collision
@@ -852,11 +884,11 @@ function update(dt){
       continue; }
     if(en.stun>0){ en.stun-=dt;        // frozen by a wonder flower: harmless, stompable statue
       if(pl.hurt<=0 && rectHit(pl,en) && ((pl.vy>0&&(pl.y+pl.h)-en.y<20)||pl.pounding||pl.big)){
-        en.alive=false; if(!pl.pounding&&!pl.big) pl.vy=-460; addPop(en.x+en.w/2,en.y); sfx('stomp'); }
+        en.alive=false; if(!pl.pounding&&!pl.big) pl.vy=-460; addPop(en.x+en.w/2,en.y); sfx('stomp'); dropLoot(en); }
       continue; }
     if(et==='fly'){
       // hovers: no gravity, drifts + bobs, reverses at walls
-      en.vx=80*en.dir;
+      en.vx=(remixOn?104:80)*en.dir;
       if(moveX(en,en.vx*dt)) en.dir*=-1;
       en.phase+=dt; en.y=en.baseY+Math.sin(en.phase*2.2)*28;
     }
@@ -871,11 +903,11 @@ function update(dt){
       }
     }
     else { // walk, jump, chase — grounded patrollers
-      let spd=60;
+      let spd=remixOn?80:60;
       if(et==='chase'){
         const near=Math.abs((pl.x+pl.w/2)-(en.x+en.w/2))<260 && Math.abs((pl.y+pl.h/2)-(en.y+en.h/2))<70;
         en.chasing=near;
-        if(near){ en.dir=(pl.x+pl.w/2<en.x+en.w/2)?-1:1; spd=140; }
+        if(near){ en.dir=(pl.x+pl.w/2<en.x+en.w/2)?-1:1; spd=remixOn?170:140; }
       }
       en.vx=spd*en.dir;
       en.vy+=G*dt; en.vy=Math.min(en.vy,MAXFALL);
@@ -892,9 +924,9 @@ function update(dt){
     if(en.y>H*TILE+80){ en.alive=false; continue; }
     // vs player — stomp/pound from above kills; flyers count too
     if(pl.hurt<=0 && rectHit(pl,en)){
-      if(pl.big){ en.alive=false; addPop(en.x+en.w/2,en.y); sfx('stomp'); }   // giant hero squashes on touch
+      if(pl.big){ en.alive=false; addPop(en.x+en.w/2,en.y); sfx('stomp'); dropLoot(en); }   // giant hero squashes on touch
       else if((pl.vy>0 && (pl.y+pl.h)-en.y < 20) || pl.pounding){
-        en.alive=false; if(!pl.pounding) pl.vy=-460; addPop(en.x+en.w/2,en.y); sfx('stomp');
+        en.alive=false; if(!pl.pounding) pl.vy=-460; addPop(en.x+en.w/2,en.y); sfx('stomp'); dropLoot(en);
       } else hitPlayer();
     }
   }
@@ -907,9 +939,9 @@ function update(dt){
       if(boss&&boss.alive&&boss.active&&boss.inv<=0 && pr.x>boss.x-6 && pr.x<boss.x+boss.w+6 && pr.y>boss.y-6 && pr.y<boss.y+boss.h+6){
         pr.dead=true; if(pr.bubble){ addPop(pr.x,pr.y); sfx('pop'); } else bossHit(); continue; }
       for(const en of enemies){ if(en.alive && !en.bubbled && pr.x>en.x-6 && pr.x<en.x+en.w+6 && pr.y>en.y-6 && pr.y<en.y+en.h+6){
-        pr.dead=true;
-        if(pr.bubble){ en.bubbled=8; en.vx=0; en.vy=0; sfx('bubble'); }
-        else{ en.alive=false; addPop(en.x+en.w/2,en.y); sfx('stomp'); }
+        if(pr.bubble){ pr.dead=true; en.bubbled=8; en.vx=0; en.vy=0; sfx('bubble'); }
+        else{ if(!hatIs('wiz')) pr.dead=true;   // wizard stars pierce through
+          en.alive=false; addPop(en.x+en.w/2,en.y); sfx('stomp'); dropLoot(en); }
         break; } }
       continue;
     }
@@ -975,7 +1007,7 @@ function update(dt){
   // springs — land on one to launch skyward
   for(const s of springs){ if(s.t>0) s.t-=dt;
     if(pl.vy>0 && pl.x+pl.w>s.x+2 && pl.x<s.x+s.w-2 && pl.y+pl.h>s.y-2 && pl.y+pl.h<s.y+s.h+14){
-      pl.y=s.y-pl.h; pl.vy=-1150; pl.jumps=1; pl.pounding=false; s.t=0.3; sfx('spring'); } }
+      pl.y=s.y-pl.h; pl.vy=hatIs('horn')?-1380:-1150; pl.jumps=1; pl.pounding=false; s.t=0.3; sfx('spring'); } }
   // moving platforms — one-way top surface that carries the player
   for(const m of movers){ const dxm=m.vx*dt; m.x+=dxm; if(m.x<m.x0||m.x>m.x1){ m.vx*=-1; m.x=Math.max(m.x0,Math.min(m.x,m.x1)); }
     if(pl.vy>=0 && pl.x+pl.w>m.x+4 && pl.x<m.x+m.w-4){ const pb=pl.y+pl.h;
@@ -987,7 +1019,7 @@ function update(dt){
   for(const g of gems){ if(g.got) continue;
     if(Math.abs(pl.x+pl.w/2-g.x)<24+pl.w/2 && Math.abs(pl.y+pl.h/2-g.y)<26+pl.h/2){
       g.got=true; sfx('gem'); toasts.push({x:g.x,y:g.y-20,ic:'💎',t:1.2});
-      const gs=gemStore[curLevel]||(gemStore[curLevel]=[]); gs[g.i]=true; saveGems(); } }
+      if(!remixOn){ const gs=gemStore[curLevel]||(gemStore[curLevel]=[]); gs[g.i]=true; saveGems(); } } }
   // wonder flower — touch to flip the rules for a few seconds
   if(wonder && !wonder.used && Math.abs(pl.x+pl.w/2-wonder.x)<30 && Math.abs(pl.y+pl.h/2-wonder.y)<34){
     wonder.used=true; wonderT=9; wonderFx=['coinrain','lowgrav','giant','freeze'][curLevel%4];
@@ -1002,8 +1034,32 @@ function update(dt){
     if(wonderT<=0){ gMul=1; wonderFx=null; } }
   // level clock (time attack; boss rush keeps its own pace)
   if(!rushMode) levelT+=dt;
+  // ghost recorder (10Hz, normal runs only)
+  if(!rushMode && !remixOn){ recT+=dt;
+    while(recT>=0.1){ recT-=0.1; if(ghostRec.length<6000){ ghostRec.push(Math.round(pl.x),Math.round(pl.y)); } } }
+  // frog mount 🐸
+  if(frog){
+    if(frog.state==='idle'){
+      frog.hopT-=dt; frog.vy+=G*dt; frog.vy=Math.min(frog.vy,MAXFALL);
+      frog.onG=moveY(frog,frog.vy*dt);
+      if(frog.hopT<=0 && frog.onG){ frog.vy=-240; frog.hopT=1.6+((frog.x/97)%1); }
+      if(pl.hurt<=0 && rectHit(pl,frog)){ frog.state='ride'; sfx('power'); toasts.push({x:frog.x+13,y:frog.y-14,ic:'🐸',t:1.2}); }
+    } else if(frog.state==='ride'){
+      frog.x=pl.x+pl.w/2-13; frog.y=pl.y+pl.h-10;
+      frog.tongueT-=dt; if(frog.tShow>0) frog.tShow-=dt;
+      if(frog.tongueT<=0){ let best=null,bd=110;
+        for(const c of coins){ if(c.got||c.fall) continue; const d=Math.hypot(c.x-(frog.x+13),c.y-frog.y); if(d<bd){bd=d;best=c;} }
+        if(best){ best.got=true; coinsGot++; sfx('coin'); frog.tx=best.x; frog.ty=best.y; frog.tShow=0.15; frog.tongueT=0.7; }
+        else frog.tongueT=0.25; }
+    } else { // fleeing after taking a hit for you
+      frog.fleeT-=dt; frog.vy+=G*dt; frog.vy=Math.min(frog.vy,MAXFALL);
+      if(moveY(frog,frog.vy*dt)) frog.vy=-340;
+      moveX(frog,frog.dir*170*dt);
+      if(frog.fleeT<=0) frog=null;
+    }
+  }
   // pet buddy — follows, scoops nearby coins, recharges its guardian save
-  if(pet){ pet.bob+=dt; if(pet.cd>0) pet.cd-=dt;
+  if(pet){ pet.bob+=dt; if(pet.cd>0) pet.cd-=dt*(hatIs('party')?2:1);
     const tx2=pl.x+pl.w/2-pl.face*34, ty2=pl.y+pl.h/2-14+Math.sin(pet.bob*3)*5;
     pet.x+=(tx2-pet.x)*Math.min(1,dt*5); pet.y+=(ty2-pet.y)*Math.min(1,dt*5);
     for(const c of coins){ if(c.got||c.fall) continue;
@@ -1048,6 +1104,8 @@ function bossHit(){ const b=boss; if(!b||!b.alive) return;
 }
 function hitPlayer(){ if(p.hurt>0) return;
   if(p.shieldT>0){ p.hurt=0.4; sfx('shield'); return; }   // shield soaks the hit
+  if(frog && frog.state==='ride'){ frog.state='flee'; frog.fleeT=2.2; frog.dir=-(p.face||1);   // frog takes the hit and flees
+    frog.y=p.y+p.h-24; p.hurt=1.1; p.vy=-260; sfx('hurt'); toasts.push({x:frog.x+13,y:frog.y-16,ic:'🐸',t:1.2}); return; }
   if(pet && pet.cd<=0){ pet.cd=20; p.hurt=1.1; sfx('shield');   // pet bravely blocks the hit
     addPop(pet.x,pet.y); toasts.push({x:pet.x,y:pet.y-18,ic:'🐣',t:1.2}); return; }
   if(p.big||p.wantBig){ p.wantBig=false; p.hurt=1.1; p.vy=-320; p.vx=-p.face*260; sfx('hurt'); return; }  // lose your size, not a heart
@@ -1292,6 +1350,17 @@ function render(){
   // pops
   for(const pop of pops){ const a=pop.t/0.35; ctx.strokeStyle='rgba(255,255,255,'+a+')'; ctx.lineWidth=3;
     ctx.beginPath(); ctx.arc(pop.x,pop.y,(1-a)*22+6,0,7); ctx.stroke(); }
+  // best-run ghost 👻
+  if(ghostPlay && !rushMode && ghostPlay.length>=4){
+    const gi=levelT/0.1, i0=Math.max(0,Math.min(Math.floor(gi), ghostPlay.length/2-2)), fr2=Math.min(1,gi-i0);
+    const gx=ghostPlay[i0*2]*(1-fr2)+ghostPlay[i0*2+2]*fr2, gy=ghostPlay[i0*2+1]*(1-fr2)+ghostPlay[i0*2+3]*fr2;
+    ctx.globalAlpha=0.32; ctx.fillStyle='#d8e6ff'; roundRect(gx,gy,24,30,8); ctx.fill();
+    ctx.fillStyle='#334'; ctx.fillRect(gx+5,gy+9,4,5); ctx.fillRect(gx+15,gy+9,4,5);
+    ctx.beginPath(); ctx.moveTo(gx,gy+30); ctx.lineTo(gx+6,gy+25); ctx.lineTo(gx+12,gy+30); ctx.lineTo(gx+18,gy+25); ctx.lineTo(gx+24,gy+30); ctx.stroke();
+    ctx.globalAlpha=1;
+  }
+  // frog mount 🐸 (drawn under the hero while ridden)
+  if(frog) drawFrog();
   // player
   if(p) drawHero();
   if(pet) drawPet();
@@ -1420,6 +1489,19 @@ function drawHero(){
     ctx.beginPath(); ctx.arc(cx,cy,Math.max(b.w,b.h)*0.75,0,7); ctx.fill(); ctx.stroke();
   }
 }
+function drawFrog(){ const f=frog, fx2=f.x+13, fy2=f.y+12;
+  if(f.tShow>0){ ctx.strokeStyle='#ff7a9a'; ctx.lineWidth=3;   // tongue slurp!
+    ctx.beginPath(); ctx.moveTo(fx2,fy2-4); ctx.lineTo(f.tx,f.ty); ctx.stroke();
+    ctx.fillStyle='#ff7a9a'; ctx.beginPath(); ctx.arc(f.tx,f.ty,4,0,7); ctx.fill(); }
+  ctx.fillStyle='rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(fx2,f.y+f.h,12,3,0,0,7); ctx.fill();
+  ctx.fillStyle='#4fc06a';
+  ctx.beginPath(); ctx.ellipse(fx2,fy2,13,10,0,0,7); ctx.fill();                     // body
+  ctx.beginPath(); ctx.ellipse(fx2-9,f.y+f.h-3,5,3.4,0,0,7); ctx.ellipse(fx2+9,f.y+f.h-3,5,3.4,0,0,7); ctx.fill();  // legs
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(fx2-5,f.y+2,4.4,0,7); ctx.arc(fx2+5,f.y+2,4.4,0,7); ctx.fill();    // eyes
+  ctx.fillStyle='#222'; ctx.beginPath(); ctx.arc(fx2-5,f.y+2,2,0,7); ctx.arc(fx2+5,f.y+2,2,0,7); ctx.fill();
+  ctx.strokeStyle='#2a7a42'; ctx.lineWidth=1.6; ctx.beginPath(); ctx.arc(fx2,fy2+3,5,0.15*Math.PI,0.85*Math.PI); ctx.stroke();
+  if(f.state==='idle' && Math.floor(performance.now()/900)%3===0){ ctx.fillStyle='rgba(255,255,255,.9)'; ctx.font='10px sans-serif'; ctx.textAlign='center'; ctx.fillText('ribbit',fx2,f.y-8); }
+}
 function drawPet(){ const px=pet.x, py=pet.y, rdy=pet.cd<=0;
   ctx.save(); ctx.globalAlpha=rdy?1:0.55;
   ctx.fillStyle='rgba(0,0,0,.12)'; ctx.beginPath(); ctx.ellipse(px,py+13,8,2.6,0,0,7); ctx.fill();
@@ -1472,13 +1554,15 @@ function hideOverlays(){ ['startScreen','overScreen','victoryScreen'].forEach(id
 function toMenu(){ state='start'; rushMode=false; hideOverlays(); document.getElementById('startScreen').classList.remove('hidden'); buildMenu(); setTrack('title'); }
 function win(){ sfx('win');
   if(curLevel>=LEVELS.length-1){ const tf=Math.round(levelT);
-    if(!rushMode && (timeStore[curLevel]==null||tf<timeStore[curLevel])){ timeStore[curLevel]=tf; saveTimes(); }
+    if(!rushMode && !remixOn && (timeStore[curLevel]==null||tf<timeStore[curLevel])){ timeStore[curLevel]=tf; saveTimes();
+      ghostStoreObj[curLevel]=ghostRec.slice(0,6000); saveGhosts(); }
     showVictory(); return; }
   setTrack(null);
   const o=document.getElementById('overScreen'), rt=document.getElementById('resultText');
   rt.className='big win'; rt.textContent='LEVEL CLEAR! 🏁';
   const t=Math.round(levelT), med=medalFor(curLevel,t), old=timeStore[curLevel];
-  if(old==null||t<old){ timeStore[curLevel]=t; saveTimes(); }
+  if(!remixOn && (old==null||t<old)){ timeStore[curLevel]=t; saveTimes();
+    ghostStoreObj[curLevel]=ghostRec.slice(0,6000); saveGhosts(); }   // your best run becomes the ghost to race
   const best=timeStore[curLevel];
   document.getElementById('resultSub').textContent='Nice! '+coinsGot+' / '+coins.length+' coins, '+hearts+' ❤️ left. ⏱ '+fmtT(t)+(med?' '+med:'')+' (best '+fmtT(best)+'). Up next: '+LEVELS[curLevel+1].name+'!';
   document.getElementById('againBtn').textContent='↺ Replay level';
@@ -1523,7 +1607,7 @@ function buildMenu(){
   const hw=document.getElementById('hats'); hw.innerHTML='';
   HATS.forEach(h=>{ const d=document.createElement('div'); const open=hatOpen(h);
     d.className='chip'+(h.id===sel.hat?' sel':''); d.style.opacity=open?'':'0.45';
-    d.textContent=open ? h.ic+' '+h.nm : '🔒 '+h.ic+' '+h.nm+' — '+h.hint;
+    d.textContent=open ? h.ic+' '+h.nm+(h.pw?' · '+h.pw:'') : '🔒 '+h.ic+' '+h.nm+' — '+h.hint;
     d.onclick=()=>{ if(!hatOpen(h)) return; sel.hat=h.id; [...hw.children].forEach(x=>x.classList.remove('sel')); d.classList.add('sel'); saveHero(); }; hw.appendChild(d); });
   const aw=document.getElementById('abilities'); aw.innerHTML='';
   ABILITIES.forEach(ab=>{ const d=document.createElement('div'); d.dataset.id=ab.id;
@@ -1542,6 +1626,10 @@ document.getElementById('playBtn').onclick=()=>startGame(menuLevel);
 document.getElementById('nextBtn').onclick=()=>startGame(curLevel+1);
 document.getElementById('againBtn').onclick=()=>rushMode?startRush():startGame(curLevel);
 document.getElementById('rushBtn').onclick=()=>{ saveHero(); startRush(); };
+const remixTogEl=document.getElementById('remixTog');
+function updRemixUI(){ remixTogEl.textContent='🔀 Remix: '+(sel.remix?'ON':'OFF')+(sel.remix?' — mirrored & spicy!':''); remixTogEl.classList.toggle('sel',!!sel.remix); }
+remixTogEl.onclick=()=>{ sel.remix=!sel.remix; saveHero(); updRemixUI(); };
+updRemixUI();
 document.getElementById('overMenu').onclick=toMenu;
 document.getElementById('menuBtn').onclick=toMenu;
 document.getElementById('vicAgain').onclick=()=>startGame(0);
