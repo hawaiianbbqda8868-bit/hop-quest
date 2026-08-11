@@ -50,6 +50,7 @@
   .play { margin-top:10px; padding:15px 52px; font-size:26px; font-weight:800; color:#06243a; border:none; border-radius:36px;
     background:linear-gradient(180deg,#a8ff9c,#3fbf5a); box-shadow:0 6px 18px rgba(0,0,0,.45); cursor:pointer; }
   .play:active { transform:translateY(2px); }
+  .rush { background:linear-gradient(180deg,#e0a8ff,#9a4ae0); color:#2a0a3a; font-size:19px; padding:11px 36px; margin-top:8px; }
   .big { font-size:clamp(40px,13vw,84px); font-weight:900; }
   .win { color:#7ee08a; } .lose { color:#ff7a7a; }
   #hud { position:fixed; top:12px; left:14px; z-index:30; color:#fff; font-size:20px; font-weight:800;
@@ -112,6 +113,7 @@
   </div>
 
   <button class="play" id="playBtn">PLAY ▶</button>
+  <button class="play rush" id="rushBtn">👑 BOSS RUSH</button>
   <div class="sub" style="margin-top:10px">Move: ◀ ▶ / arrows · Jump: ▲ / Space · Power: ✦ / Shift</div>
 </div>
 
@@ -134,7 +136,7 @@
 </div>
 
 <script>
-const APP_VERSION='v14';
+const APP_VERSION='v15';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -163,6 +165,7 @@ function has(a){ return sel.abil.has(a); }
 let W, H, grid, coins, enemies, spikes, projectiles, boxes, presents, toasts, boss, flag, startPx, curTheme, curName, curLevel=0;
 let springs, movers, gems, checkpoint, wonder;          // auto-placed per level
 let wonderT=0, wonderFx=null, gMul=1;                   // wonder-flower effect state
+let rushMode=false, rushIdx=0, rushT=0, rushAdv=false;  // 👑 boss rush state
 let gemStore={};                                        // 💎 collection, persisted per level
 try{ gemStore=JSON.parse(localStorage.getItem('hopGems')||'{}')||{}; }catch(e){}
 function saveGems(){ try{ localStorage.setItem('hopGems', JSON.stringify(gemStore)); }catch(e){} }
@@ -667,6 +670,28 @@ function buildLevel(idx){
   const sx=def.startX!=null?def.startX:2, st=(def.startTop!=null?def.startTop:GT)+SKY;
   startPx={ x:sx*TILE, y:st*TILE-40 };
 }
+// ---------- boss rush ----------
+function rushBest(){ return +(localStorage.getItem('hopRushBest')||0); }
+function saveRushBest(n){ try{ if(n>rushBest()) localStorage.setItem('hopRushBest',n); }catch(e){} }
+function buildRushArena(i){
+  const def=LEVELS[i], GT=10;
+  curLevel=i; curTheme=def.theme; curName='Boss Rush '+(i+1)+'/'+LEVELS.length;
+  W=44; H=13+SKY; grid=Array.from({length:H},()=>new Array(W).fill(0));
+  coins=[]; enemies=[]; spikes=[]; projectiles=[]; boxes=[]; presents=[]; toasts=[];
+  springs=[]; movers=[]; gems=[]; checkpoint=null; wonder=null; wonderT=0; wonderFx=null; gMul=1;
+  for(let x=0;x<W;x++) for(let y=GT;y<13;y++) grid[y+SKY][x]=1;         // solid floor, no pits
+  const lay=[[[6,7,3],[14,5,3],[35,7,3]],[[8,6,3],[20,4,3],[32,6,3]],[[5,7,3],[22,5,4],[37,7,3]]][i%3];
+  lay.forEach(([x,y,w])=>{ for(let k=0;k<w;k++) grid[y+SKY][x+k]=2; }); // a few hop platforms
+  boxes.push({x:lay[0][0]*TILE+8, y:(lay[0][1]-1+SKY)*TILE+4, w:32, h:36, open:false});
+  const cfg=def.boss, big=cfg.hp>=6, bw=big?76:60, bh=big?66:52;
+  boss={ x:(W-8)*TILE, y:(GT+SKY)*TILE-bh, w:bw, h:bh,
+         hp:cfg.hp, maxHp:cfg.hp, nm:cfg.nm, col:cfg.col, shots:cfg.shots, hop:cfg.hop||(big?140:110),
+         active:true, alive:true, vx:0, vy:0, onGround:false, hopT:1.2, shotT:2.5, inv:0, face:-1 };
+  flag={ x:W*TILE+400, top:0, h:1 };                                    // off-map: no flag wins in rush
+  startPx={ x:3*TILE, y:(GT+SKY)*TILE-40 };
+  rushAdv=false;
+}
+function startRush(){ rushMode=true; rushIdx=0; buildRushArena(0); resetPlayer(); state='play'; winFlash=0; deathTimer=0; hideOverlays(); setTrack('boss'); }
 function solidAt(tx,ty){
   if(tx<0||tx>=W) return true;      // level walls
   if(ty<0) return false;            // open sky
@@ -683,7 +708,7 @@ function resetPlayer(){
   maxHearts=3+(has('heart')?1:0); hearts=maxHearts; coinsGot=0;
   cam={x:0,y:Math.max(0,H*TILE-VH)};   // start looking at the ground, not the empty sky
 }
-function startGame(idx){ if(idx==null) idx=menuLevel; menuLevel=((idx%LEVELS.length)+LEVELS.length)%LEVELS.length; saveHero(); buildLevel(menuLevel); resetPlayer(); state='play'; winFlash=0; deathTimer=0; hideOverlays(); setTrack(LEVELS[menuLevel].music||'cheery'); }
+function startGame(idx){ rushMode=false; if(idx==null) idx=menuLevel; menuLevel=((idx%LEVELS.length)+LEVELS.length)%LEVELS.length; saveHero(); buildLevel(menuLevel); resetPlayer(); state='play'; winFlash=0; deathTimer=0; hideOverlays(); setTrack(LEVELS[menuLevel].music||'cheery'); }
 
 // ---------- input ----------
 const keys={left:false,right:false,jump:false,jumpEdge:false,act:false,actEdge:false};
@@ -929,6 +954,16 @@ function update(dt){
     if(wonderFx==='coinrain'){ rainT-=dt; if(rainT<=0){ rainT=0.18;
       coins.push({x:cam.x+20+Math.random()*(VW-40), y:cam.y-10, got:false, fall:true, vy:40+Math.random()*140}); } }
     if(wonderT<=0){ gMul=1; wonderFx=null; } }
+  // boss rush: beaten boss → grab the coin ring, then on to the next arena
+  if(rushMode && boss && !boss.alive){
+    if(!rushAdv){ rushAdv=true; rushT=1.8; saveRushBest(rushIdx+1);
+      toasts.push({x:boss.x+boss.w/2, y:boss.y, ic:'👑', t:1.4}); }
+    else{ rushT-=dt;
+      if(rushT<=0){ rushIdx++;
+        if(rushIdx>=LEVELS.length){ state='over'; winFlash=1; sfx('win'); showVictory(); }
+        else{ hearts=Math.min(maxHearts,hearts+1); const keep=p;
+          buildRushArena(rushIdx); keep.x=startPx.x; keep.y=startPx.y; keep.vx=0; keep.vy=0;
+          toasts.push({x:keep.x+12, y:keep.y-24, ic:'👑', t:1.2}); setTrack('boss'); } } } }
   // flag / goal (locked while the boss guards it)
   if(!(boss&&boss.alive) && pl.x+pl.w>flag.x && pl.y+pl.h>flag.top){ state='over'; winFlash=1; win(); }
   // camera
@@ -1323,7 +1358,7 @@ function drawHUD(){
 
 // ---------- overlays / UI ----------
 function hideOverlays(){ ['startScreen','overScreen','victoryScreen'].forEach(id=>document.getElementById(id).classList.add('hidden')); }
-function toMenu(){ state='start'; hideOverlays(); document.getElementById('startScreen').classList.remove('hidden'); buildMenu(); setTrack('title'); }
+function toMenu(){ state='start'; rushMode=false; hideOverlays(); document.getElementById('startScreen').classList.remove('hidden'); buildMenu(); setTrack('title'); }
 function win(){ sfx('win');
   if(curLevel>=LEVELS.length-1){ showVictory(); return; }
   setTrack(null);
@@ -1334,7 +1369,9 @@ function win(){ sfx('win');
   o.classList.remove('hidden'); }
 function showVictory(){
   setTrack('finale');   // keep the celebration tune rolling
-  document.getElementById('vicSub').textContent='You conquered all '+LEVELS.length+' worlds and toppled every boss! Final run: '+coinsGot+' / '+coins.length+' 🪙 with '+hearts+' ❤️ to spare.';
+  document.getElementById('vicSub').textContent=rushMode
+    ? 'BOSS RUSH CHAMPION! All '+LEVELS.length+' bosses toppled in one run with '+hearts+' ❤️ to spare!'
+    : 'You conquered all '+LEVELS.length+' worlds and toppled every boss! Final run: '+coinsGot+' / '+coins.length+' 🪙 with '+hearts+' ❤️ to spare.';
   const c=document.getElementById('confetti');
   if(!c.childElementCount){
     const cols=['#ffd54a','#ff6b6b','#5fe08a','#46c8ff','#c77dff','#ff7ad1','#ffffff'];
@@ -1347,12 +1384,16 @@ function showVictory(){
   document.getElementById('victoryScreen').classList.remove('hidden');
 }
 function lose(){ setTrack(null); const o=document.getElementById('overScreen'), rt=document.getElementById('resultText'); rt.textContent='OUCH! 💥'; rt.className='big lose';
-  document.getElementById('resultSub').textContent='You collected '+coinsGot+' coins. Try again or a different power loadout!';
+  if(rushMode){ saveRushBest(rushIdx);
+    document.getElementById('resultSub').textContent='Boss Rush over — you toppled '+rushIdx+' of '+LEVELS.length+' bosses! Best streak: '+rushBest()+'.'; }
+  else document.getElementById('resultSub').textContent='You collected '+coinsGot+' coins. Try again or a different power loadout!';
+  document.getElementById('againBtn').textContent=rushMode?'↺ Rush again':'↺ Replay level';
   document.getElementById('nextBtn').style.display='none';
   o.classList.remove('hidden'); }
 
 function buildMenu(){
   if(menuLevel>=LEVELS.length||menuLevel<0) menuLevel=0;
+  const rb=rushBest(); document.getElementById('rushBtn').textContent='👑 BOSS RUSH'+(rb?' · Best '+rb+'/'+LEVELS.length:'');
   const lw=document.getElementById('levels'); lw.innerHTML='';
   LEVELS.forEach((lv,i)=>{ const d=document.createElement('div'); d.className='chip'+(i===menuLevel?' sel':'');
     const gn=(gemStore[i]||[]).filter(Boolean).length;
@@ -1379,7 +1420,8 @@ function refreshAbil(){
 }
 document.getElementById('playBtn').onclick=()=>startGame(menuLevel);
 document.getElementById('nextBtn').onclick=()=>startGame(curLevel+1);
-document.getElementById('againBtn').onclick=()=>startGame(curLevel);
+document.getElementById('againBtn').onclick=()=>rushMode?startRush():startGame(curLevel);
+document.getElementById('rushBtn').onclick=()=>{ saveHero(); startRush(); };
 document.getElementById('overMenu').onclick=toMenu;
 document.getElementById('menuBtn').onclick=toMenu;
 document.getElementById('vicAgain').onclick=()=>startGame(0);
