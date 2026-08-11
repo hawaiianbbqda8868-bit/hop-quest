@@ -54,6 +54,10 @@
   .tabs { margin:2px 0 8px; }
   .pane.hidden { display:none; }
   #levels { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
+  #mapNodes { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
+  #mapNodes .chip { font-size:12px; padding:8px 6px; text-align:center; }
+  #mapNodes .chip.lk { opacity:.45; }
+  #mapNodes .chip.done { border-color:#5fe08a; }
   #levels .chip { font-size:12px; padding:7px 6px; text-align:center; }
   #editBar { position:fixed; top:8px; left:50%; transform:translateX(-50%); z-index:40; text-align:center;
     background:rgba(10,16,40,.88); border-radius:14px; padding:8px 10px; width:min(96vw,860px); }
@@ -107,11 +111,13 @@
   <div class="title">HOP QUEST</div>
   <div class="sub">every power unlocked · run &amp; jump!</div>
 
-  <button class="play" id="playBtn">PLAY ▶</button>
+  <button class="play" id="advBtn" style="background:linear-gradient(90deg,#ff6b6b,#ffd54a,#5fe08a,#46c8ff,#c77dff);color:#1a1030">🌈 ADVENTURE</button>
+  <button class="play" id="playBtn" style="font-size:19px;padding:11px 36px;margin-top:8px">FREE PLAY ▶</button>
   <div class="sub" id="playSel" style="margin:8px 0 4px"></div>
   <div class="row" style="margin-bottom:10px">
     <button class="chip modebtn" id="rushBtn" style="background:linear-gradient(180deg,#e0a8ff,#9a4ae0);color:#2a0a3a;border:none">👑 BOSS RUSH</button>
     <button class="chip modebtn" id="dailyBtn" style="background:linear-gradient(180deg,#8ae0ff,#3a8ae0);color:#082a4a;border:none">🎲 DAILY</button>
+    <button class="chip modebtn" id="survBtn" style="background:linear-gradient(180deg,#ffb08a,#e05a3a);color:#3a1208;border:none">👾 SURVIVAL</button>
   </div>
 
   <div class="row tabs">
@@ -147,6 +153,14 @@
   <div class="sub" style="margin-top:8px">Move: ◀ ▶ / arrows · Jump: ▲ / Space · Power: ✦ / Shift</div>
 </div>
 
+<div class="overlay hidden" id="mapScreen">
+  <div class="title" style="font-size:clamp(28px,7vw,48px)">🌈 ADVENTURE</div>
+  <div class="sub" id="mapStory">The Rainbow King stole every world's color! Clear levels to win it back, earn ⭐ to open the gates.</div>
+  <div class="sub" id="mapStars" style="font-weight:800"></div>
+  <div class="card"><div id="mapNodes"></div></div>
+  <button class="chip" id="mapBack" style="margin-top:10px">← Menu</button>
+</div>
+
 <div class="overlay hidden" id="victoryScreen">
   <div class="confetti" id="confetti"></div>
   <div style="font-size:64px">🏆</div>
@@ -166,7 +180,7 @@
 </div>
 
 <script>
-const APP_VERSION='v28';
+const APP_VERSION='v29';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -206,6 +220,22 @@ let skate=null;                                         // 🛹 rideable skatebo
 let rival=null;                                         // 🏁 AI racer to the flag
 let flips=[], flipCd=0;                                 // 🙃 gravity-flip pads
 let chaosFx=null, chaosLabel='', chaosG=1;              // 🎲 chaos mutator for this run
+// ---------- adventure mode 🌈 ----------
+let advMode=false;
+let clearStore={};
+try{ clearStore=JSON.parse(localStorage.getItem('hopClears')||'{}')||{}; }catch(e){}
+function saveClears(){ try{ localStorage.setItem('hopClears', JSON.stringify(clearStore)); }catch(e){} }
+const GATES={4:6, 8:14, 12:24, 16:34, 20:44, 22:52};
+function starsFor(i){ let s=clearStore[i]?1:0;
+  if(((gemStore[i]||[]).filter(Boolean).length)>=3) s++;
+  if(timeStore[i]!=null && medalFor(i,timeStore[i])) s++; return s; }
+function totalStars(){ let n=0; for(let i=0;i<LEVELS.length;i++) n+=starsFor(i); return n; }
+function advOpen(i){ if(i>0 && !clearStore[i-1]) return false;
+  if(GATES[i]!=null && totalStars()<GATES[i]) return false; return true; }
+// ---------- survival arena 👾 ----------
+let survMode=false, survWave=0, survT=0;
+function survBest(){ return +(localStorage.getItem('hopSurv')||0); }
+function saveSurvBest(n){ try{ if(n>survBest()) localStorage.setItem('hopSurv',String(n)); }catch(e){} }
 const CHAOS=[['tiny','🤏 TINY HERO'],['giantfoes','👹 GIANT ENEMIES'],['bouncy','🦘 BOUNCY FLOOR'],['ice','🧊 ICE WORLD'],['runaway','🏃 RUNAWAY COINS'],['turbo','⚡ TURBO'],['oneheart','💔 ONE HEART'],['rain','🌧️ COIN RAIN'],['lowg','🌙 MOON WORLD'],['dark','🌑 DARKNESS'],['magnet','🧲 MEGA MAGNET']];
 let remixOn=false;                                      // 🔀 mirrored+spicier levels
 let ghostRec=[], ghostPlay=null, recT=0;                // 👻 best-run ghost
@@ -739,7 +769,7 @@ function genDaily(){
       [plats[0],plats[(plats.length/2)|0],plats[plats.length-1]].forEach(pp=>L.box(pp[0]+1,pp[1]-1));
     } };
 }
-function startDaily(){ rushMode=false; remixOn=false; customMode=false; dailyMode=true; rival=null; dailyDef=genDaily();
+function startDaily(){ rushMode=false; remixOn=false; customMode=false; survMode=false; advMode=false; dailyMode=true; rival=null; dailyDef=genDaily();
   buildLevel(0,dailyDef); ghostPlay=null; ghostRec=[]; recT=0;
   resetPlayer(); state='play'; winFlash=0; deathTimer=0; hideOverlays(); setTrack(dailyDef.music); }
 function buildLevel(idx, defO){
@@ -948,13 +978,13 @@ function edRandom(){   // 🎲 fill the canvas with a generated world to edit fr
   editRows=rows; saveCustom();
   const cx0=cam.x, cy0=cam.y; buildCustomLevel(); p=null; pet=null; cam={x:cx0,y:cy0};
 }
-function openEditor(){ editRows=loadCustom(); editMode=true; customMode=false; rushMode=false; dailyMode=false; remixOn=false;
+function openEditor(){ editRows=loadCustom(); editMode=true; customMode=false; rushMode=false; dailyMode=false; survMode=false; advMode=false; remixOn=false;
   state='edit'; hideOverlays(); document.getElementById('editBar').classList.remove('hidden');
   buildCustomLevel(); p=null; pet=null; cam={x:0, y:Math.max(0,H*TILE-VH)}; setTrack(null); }
 function closeEditor(toPlay){ saveCustom(); document.getElementById('editBar').classList.add('hidden'); editMode=false;
   if(toPlay) startCustom(); else toMenu(); }
 function startCustom(){ if(!editRows) editRows=loadCustom();
-  rushMode=false; dailyMode=false; remixOn=false; customMode=true; editMode=false;
+  rushMode=false; dailyMode=false; remixOn=false; survMode=false; advMode=false; customMode=true; editMode=false;
   document.getElementById('editBar').classList.add('hidden');
   buildCustomLevel(); ghostRec=[]; recT=0; resetPlayer(); state='play'; winFlash=0; deathTimer=0; hideOverlays(); setTrack('cheery'); }
 let editPaint=false;
@@ -991,7 +1021,37 @@ function buildRushArena(i){
   startPx={ x:3*TILE, y:(GT+SKY)*TILE-40 };
   rushAdv=false;
 }
-function startRush(){ rushMode=true; dailyMode=false; customMode=false; rival=null; rushIdx=0; buildRushArena(0); resetPlayer(); state='play'; winFlash=0; deathTimer=0; hideOverlays(); setTrack('boss'); }
+function buildSurvArena(){
+  const src=LEVELS[(Math.random()*LEVELS.length)|0], GT=10;
+  curLevel=0; curTheme=src.theme; curName='👾 Survival';
+  W=44; H=13+SKY; grid=Array.from({length:H},()=>new Array(W).fill(0));
+  coins=[]; enemies=[]; spikes=[]; projectiles=[]; boxes=[]; presents=[]; toasts=[];
+  springs=[]; movers=[]; gems=[]; checkpoint=null; wonder=null; wonderT=0; wonderFx=null; gMul=1;
+  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null; cannons=[]; skate=null; flips=[]; flipCd=0; pet=null; ghostPlay=null; rival=null;
+  chaosFx=null; chaosG=1;
+  for(let x=0;x<W;x++) for(let y=GT;y<13;y++) grid[y+SKY][x]=1;
+  [[8,6,3],[20,4,3],[32,6,3]].forEach(([x,y,w])=>{ for(let k=0;k<w;k++) grid[y+SKY][x+k]=2; });
+  springs.push({x:21*TILE+4, y:(GT+SKY)*TILE-14, w:TILE-8, h:14, t:0});
+  boss=null; flag={x:W*TILE+400, top:0, h:1};
+  startPx={x:21*TILE, y:(GT+SKY)*TILE-40};
+  initWX(src.name);
+}
+function spawnWave(){
+  survWave++;
+  const pool=['walk']; if(survWave>=2) pool.push('jump'); if(survWave>=4) pool.push('fly'); if(survWave>=6) pool.push('chase'); if(survWave>=8) pool.push('shoot');
+  const n=2+survWave, giant=survWave%5===0;
+  for(let k=0;k<n;k++){ const ty2=pool[(Math.random()*pool.length)|0], x=(4+Math.random()*(W-8))*TILE;
+    const en={type:ty2, x, y:-2*TILE-Math.random()*160, w:30, h:ty2==='shoot'?32:30, vx:60, vy:0, dir:Math.random()<0.5?-1:1, alive:true, stun:0, t:1.4, onGround:false, chasing:false};
+    if(ty2==='fly'){ en.w=32; en.h=24; en.baseY=(4+Math.random()*4+SKY)*TILE; en.phase=x*0.02; en.y=en.baseY; }
+    if(giant){ en.w=Math.round(en.w*1.4); en.h=Math.round(en.h*1.4); }
+    enemies.push(en); }
+  if(survWave%2===0) boxes.push({x:(6+Math.random()*(W-14))*TILE+4, y:(9+SKY)*TILE+4, w:32, h:36, open:false});
+  toasts.push({x:p?p.x+12:startPx.x, y:(p?p.y:startPx.y)-40, ic:'👾 '+survWave, t:1.6});
+  sfx('wonder');
+}
+function startSurvival(){ rushMode=false; dailyMode=false; customMode=false; advMode=false; survMode=true; remixOn=false;
+  survWave=0; survT=0; buildSurvArena(); resetPlayer(); state='play'; winFlash=0; deathTimer=0; hideOverlays(); setTrack('danger'); spawnWave(); }
+function startRush(){ rushMode=true; dailyMode=false; customMode=false; survMode=false; rival=null; rushIdx=0; buildRushArena(0); resetPlayer(); state='play'; winFlash=0; deathTimer=0; hideOverlays(); setTrack('boss'); }
 let moveYHitUp=false;
 function solidAt(tx,ty){
   if(tx<0||tx>=W) return true;      // level walls
@@ -1011,12 +1071,13 @@ function resetPlayer(){
   maxHearts=3+(has('heart')?1:0); hearts=maxHearts; coinsGot=0;
   cam={x:0,y:Math.max(0,H*TILE-VH)};   // start looking at the ground, not the empty sky
 }
-function startGame(idx){ rushMode=false; dailyMode=false; customMode=false; editMode=false; remixOn=!!sel.remix; if(idx==null) idx=menuLevel; menuLevel=((idx%LEVELS.length)+LEVELS.length)%LEVELS.length; saveHero(); buildLevel(menuLevel);
+function startGame(idx, adv){ rushMode=false; dailyMode=false; customMode=false; editMode=false; survMode=false;
+  advMode=!!adv; remixOn=advMode?false:!!sel.remix; if(idx==null) idx=menuLevel; menuLevel=((idx%LEVELS.length)+LEVELS.length)%LEVELS.length; saveHero(); buildLevel(menuLevel);
   if(remixOn) curName+=' 🔀';
   ghostPlay=(!remixOn&&ghostStoreObj[menuLevel])||null; ghostRec=[]; recT=0;
-  rival=sel.rival?{x:startPx.x-30, y:startPx.y, w:24, h:30, vx:0, vy:0, onGround:false, done:false}:null;
+  rival=(sel.rival&&!advMode)?{x:startPx.x-30, y:startPx.y, w:24, h:30, vx:0, vy:0, onGround:false, done:false}:null;
   chaosFx=null; chaosLabel=''; chaosG=1;
-  if(sel.chaos){ const ch2=CHAOS[(Math.random()*CHAOS.length)|0]; chaosFx=ch2[0]; chaosLabel=ch2[1];
+  if(sel.chaos&&!advMode){ const ch2=CHAOS[(Math.random()*CHAOS.length)|0]; chaosFx=ch2[0]; chaosLabel=ch2[1];
     if(chaosFx==='giantfoes') enemies.forEach(en=>{ en.w=Math.round(en.w*1.5); en.h=Math.round(en.h*1.5); en.y-=en.h/3; });
     if(chaosFx==='lowg') chaosG=0.5;
   }
@@ -1413,6 +1474,12 @@ function update(dt){
       warpT=0; warpCd=1.5; pl.x=doorA.x-pl.w/2; pl.y=doorA.y-pl.h; pl.vx=0; pl.vy=0; sfx('warp'); } }
   if(warpT>0){ warpT-=dt;
     if(warpT<=0){ pl.x=doorA.x-pl.w/2; pl.y=doorA.y-pl.h; pl.vx=0; pl.vy=0; warpCd=1.5; sfx('warp'); } }
+  // survival waves 👾 — clear the arena, breathe, next wave drops in
+  if(survMode){
+    if(!enemies.some(e=>e.alive)){ survT-=dt;
+      if(survT<=0){ hearts=Math.min(maxHearts,hearts+1); spawnWave(); survT=1.6; } }
+    else survT=1.6;
+  }
   // rival racer 🏁 — intangible pace-runner heading for the flag
   if(rival && !rival.done){ const R=rival;
     R.vx=165;
@@ -2013,14 +2080,29 @@ function drawHUD(){
   if(chaosFx) extra+='<span style="color:#ffd54a">'+chaosLabel+'</span>';
   if(p&&p.inWater) extra+='<span>🌊</span>';
   if(p&&p.gflip) extra+='<span>🙃</span>';
+  if(survMode) extra+='<span style="color:#ffb08a">👾 WAVE '+survWave+'</span>';
+  if(advMode) extra+='<span>🌈</span>';
   if(!rushMode) extra+='<span style="color:#9fb6d4">⏱'+fmtT(levelT)+'</span>';
   const gg=gems?gems.filter(g=>g.got).length:0, gt=gems?gems.length:0;
   el.innerHTML='<span>'+h+'</span><span>🪙 '+coinsGot+'/'+coins.length+'</span>'+(gt?'<span>💎'+gg+'/'+gt+'</span>':'')+extra+'<span style="color:#cfe6ff">🗺️ '+(curLevel+1)+'· '+curName+'</span>';
 }
 
 // ---------- overlays / UI ----------
-function hideOverlays(){ ['startScreen','overScreen','victoryScreen'].forEach(id=>document.getElementById(id).classList.add('hidden')); }
-function toMenu(){ state='start'; rushMode=false; dailyMode=false; customMode=false; editMode=false;
+function hideOverlays(){ ['startScreen','overScreen','victoryScreen','mapScreen'].forEach(id=>document.getElementById(id).classList.add('hidden')); }
+function openMap(){ state='start'; hideOverlays(); buildMap(); document.getElementById('mapScreen').classList.remove('hidden'); setTrack('title'); }
+function buildMap(){
+  document.getElementById('mapStars').textContent='⭐ '+totalStars()+' / '+(LEVELS.length*3);
+  const mn=document.getElementById('mapNodes'); mn.innerHTML='';
+  LEVELS.forEach((lv,i)=>{ const d=document.createElement('div');
+    const open=advOpen(i), st=starsFor(i);
+    const gateBlocked=GATES[i]!=null && totalStars()<GATES[i];
+    d.className='chip'+(open?(clearStore[i]?' done':''):' lk');
+    if(open) d.textContent=(i+1)+'· '+lv.name+' '+('⭐'.repeat(st)||'·');
+    else d.textContent='🔒 '+(gateBlocked?'needs '+GATES[i]+'⭐':(i+1)+'· ???');
+    d.onclick=()=>{ if(!advOpen(i)) return; saveHero(); startGame(i,true); };
+    mn.appendChild(d); });
+}
+function toMenu(){ state='start'; rushMode=false; dailyMode=false; customMode=false; editMode=false; survMode=false; advMode=false;
   document.getElementById('editBar').classList.add('hidden'); hideOverlays(); document.getElementById('startScreen').classList.remove('hidden'); buildMenu(); setTrack('title'); }
 function win(){ sfx('win'); bank+=coinsGot; saveBank();
   if(customMode){ setTrack(null);
@@ -2043,6 +2125,7 @@ function win(){ sfx('win'); bank+=coinsGot; saveBank();
   if(curLevel>=LEVELS.length-1){ const tf=Math.round(levelT);
     if(!rushMode && !remixOn && (timeStore[curLevel]==null||tf<timeStore[curLevel])){ timeStore[curLevel]=tf; saveTimes();
       ghostStoreObj[curLevel]=ghostRec.slice(0,12000); saveGhosts(); }
+    if(advMode){ clearStore[curLevel]=true; saveClears(); }
     showVictory(); return; }
   setTrack(null);
   const o=document.getElementById('overScreen'), rt=document.getElementById('resultText');
@@ -2052,6 +2135,8 @@ function win(){ sfx('win'); bank+=coinsGot; saveBank();
     ghostStoreObj[curLevel]=ghostRec.slice(0,12000); saveGhosts(); }   // your best run becomes the ghost to race
   let rivalNote='';
   if(rival){ if(!rival.done){ bank+=25; saveBank(); rivalNote=' You beat the rival! +25 🪙 bonus.'; } else rivalNote=' The rival got there first! 😜'; }
+  if(advMode){ const was=clearStore[curLevel]; clearStore[curLevel]=true; saveClears();
+    rivalNote+=' 🌈 '+(was?'Color still shining!':'You brought this world\'s color back!')+' ⭐'+starsFor(curLevel)+'/3 · total '+totalStars()+'⭐'; }
   const best=timeStore[curLevel];
   document.getElementById('resultSub').textContent='Nice! '+coinsGot+' / '+coins.length+' coins, '+hearts+' ❤️ left. ⏱ '+fmtT(t)+(med?' '+med:'')+' (best '+fmtT(best)+').'+rivalNote+' Up next: '+LEVELS[curLevel+1].name+'!';
   document.getElementById('againBtn').textContent='↺ Replay level';
@@ -2061,6 +2146,8 @@ function showVictory(){
   setTrack('finale');   // keep the celebration tune rolling
   document.getElementById('vicSub').textContent=rushMode
     ? 'BOSS RUSH CHAMPION! All '+LEVELS.length+' bosses toppled in one run with '+hearts+' ❤️ to spare!'
+    : advMode
+    ? '🌈 EVERY COLOR RETURNED! The Rainbow King is defeated and all '+LEVELS.length+' worlds shine again! ⭐'+totalStars()+'/'+(LEVELS.length*3)
     : 'You conquered all '+LEVELS.length+' worlds and toppled every boss! Final run: '+coinsGot+' / '+coins.length+' 🪙 with '+hearts+' ❤️ to spare.';
   const c=document.getElementById('confetti');
   if(!c.childElementCount){
@@ -2075,6 +2162,11 @@ function showVictory(){
 }
 function lose(){ setTrack(null); bank+=coinsGot; saveBank();
   const o=document.getElementById('overScreen'), rt=document.getElementById('resultText'); rt.textContent='OUCH! 💥'; rt.className='big lose';
+  if(survMode){ const cleared=survWave-1; saveSurvBest(cleared);
+    document.getElementById('resultSub').textContent='You survived '+cleared+' wave'+(cleared===1?'':'s')+'! Best: '+survBest()+'. +'+coinsGot+' 🪙 banked.';
+    document.getElementById('againBtn').textContent='↺ Survive again';
+    document.getElementById('nextBtn').style.display='none';
+    o.classList.remove('hidden'); return; }
   if(rushMode){ saveRushBest(rushIdx);
     document.getElementById('resultSub').textContent='Boss Rush over — you toppled '+rushIdx+' of '+LEVELS.length+' bosses! Best streak: '+rushBest()+'.'; }
   else document.getElementById('resultSub').textContent='You collected '+coinsGot+' coins. Try again or a different power loadout!';
@@ -2086,6 +2178,8 @@ function buildMenu(){
   if(menuLevel>=LEVELS.length||menuLevel<0) menuLevel=0;
   const rb=rushBest(); document.getElementById('rushBtn').textContent='👑 BOSS RUSH'+(rb?' · Best '+rb+'/'+LEVELS.length:'');
   document.getElementById('dailyBtn').textContent='🎲 DAILY'+(dailyStore.date===todayStr()&&dailyStore.best!=null?' · '+fmtT(dailyStore.best)+(dailyStore.medal?' '+dailyStore.medal:''):'');
+  document.getElementById('survBtn').textContent='👾 SURVIVAL'+(survBest()?' · '+survBest():'');
+  document.getElementById('advBtn').textContent='🌈 ADVENTURE · ⭐'+totalStars();
   document.getElementById('bankAmt').textContent=bank;
   document.getElementById('myLvlBtn').style.display=hasCustom()?'':'none';
   const sr=document.getElementById('shopRow'); sr.innerHTML='';
@@ -2120,8 +2214,8 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('.pane').forEach(pn=>pn.classList.toggle('hidden', pn.id!=='pane-'+t.dataset.pane));
 });
 document.getElementById('playBtn').onclick=()=>startGame(menuLevel);
-document.getElementById('nextBtn').onclick=()=>startGame(curLevel+1);
-document.getElementById('againBtn').onclick=()=>rushMode?startRush():dailyMode?startDaily():customMode?startCustom():startGame(curLevel);
+document.getElementById('nextBtn').onclick=()=>startGame(curLevel+1,advMode);
+document.getElementById('againBtn').onclick=()=>rushMode?startRush():dailyMode?startDaily():customMode?startCustom():survMode?startSurvival():startGame(curLevel,advMode);
 document.getElementById('editorBtn').onclick=()=>openEditor();
 document.getElementById('myLvlBtn').onclick=()=>{ editRows=loadCustom(); startCustom(); };
 const brushRowEl=document.getElementById('brushRow');
@@ -2136,6 +2230,9 @@ document.getElementById('edTest').onclick=()=>closeEditor(true);
 document.getElementById('edExit').onclick=()=>closeEditor(false);
 document.getElementById('rushBtn').onclick=()=>{ saveHero(); startRush(); };
 document.getElementById('dailyBtn').onclick=()=>{ saveHero(); startDaily(); };
+document.getElementById('advBtn').onclick=()=>openMap();
+document.getElementById('mapBack').onclick=()=>toMenu();
+document.getElementById('survBtn').onclick=()=>{ saveHero(); startSurvival(); };
 const remixTogEl=document.getElementById('remixTog');
 function updRemixUI(){ remixTogEl.textContent='🔀 Remix: '+(sel.remix?'ON':'OFF')+(sel.remix?' — mirrored & spicy!':''); remixTogEl.classList.toggle('sel',!!sel.remix); }
 remixTogEl.onclick=()=>{ sel.remix=!sel.remix; saveHero(); updRemixUI(); buildMenu(); };
