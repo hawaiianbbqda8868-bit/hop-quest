@@ -50,7 +50,11 @@
   .play { margin-top:10px; padding:15px 52px; font-size:26px; font-weight:800; color:#06243a; border:none; border-radius:36px;
     background:linear-gradient(180deg,#a8ff9c,#3fbf5a); box-shadow:0 6px 18px rgba(0,0,0,.45); cursor:pointer; }
   .play:active { transform:translateY(2px); }
-  .rush { background:linear-gradient(180deg,#e0a8ff,#9a4ae0); color:#2a0a3a; font-size:19px; padding:11px 36px; margin-top:8px; }
+  .modebtn { font-weight:800; font-size:15px; padding:10px 18px; }
+  .tabs { margin:2px 0 8px; }
+  .pane.hidden { display:none; }
+  #levels { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
+  #levels .chip { font-size:12px; padding:7px 6px; text-align:center; }
   .big { font-size:clamp(40px,13vw,84px); font-weight:900; }
   .win { color:#7ee08a; } .lose { color:#ff7a7a; }
   #hud { position:fixed; top:12px; left:14px; z-index:30; color:#fff; font-size:20px; font-weight:800;
@@ -85,42 +89,45 @@
 
 <div class="overlay" id="startScreen">
   <div class="title">HOP QUEST</div>
-  <div class="sub">Build your hero · pick your powers · run &amp; jump!</div>
+  <div class="sub">every power unlocked · run &amp; jump!</div>
 
-  <div class="card">
-    <div class="lbl">Level — pick where to start</div>
-    <div class="row" id="levels"></div>
+  <button class="play" id="playBtn">PLAY ▶</button>
+  <div class="sub" id="playSel" style="margin:8px 0 4px"></div>
+  <div class="row" style="margin-bottom:10px">
+    <button class="chip modebtn" id="rushBtn" style="background:linear-gradient(180deg,#e0a8ff,#9a4ae0);color:#2a0a3a;border:none">👑 BOSS RUSH</button>
+    <button class="chip modebtn" id="dailyBtn" style="background:linear-gradient(180deg,#8ae0ff,#3a8ae0);color:#082a4a;border:none">🎲 DAILY</button>
+  </div>
+
+  <div class="row tabs">
+    <button class="chip tab sel" data-pane="levels">🗺️ Levels</button>
+    <button class="chip tab" data-pane="hero">🎨 Hero</button>
+    <button class="chip tab" data-pane="shop">🛒 Shop</button>
+    <button class="chip tab" data-pane="sound">🔊 Sound</button>
+  </div>
+
+  <div class="card pane" id="pane-levels">
+    <div class="lbl">Pick where to start</div>
+    <div id="levels"></div>
     <div class="row" style="margin-top:8px"><button class="chip" id="remixTog">🔀 Remix: OFF</button></div>
   </div>
-  <div class="card">
+  <div class="card pane hidden" id="pane-hero">
     <div class="lbl">Color</div>
     <div class="row" id="colors"></div>
-  </div>
-  <div class="card">
-    <div class="lbl">Hat — each one has a power!</div>
+    <div class="lbl" style="margin-top:12px">Hat — each one has a power!</div>
     <div class="row" id="hats"></div>
   </div>
-  <div class="card">
-    <div class="lbl">Abilities — pick up to <b>3</b></div>
-    <div class="budget" id="budget"></div>
-    <div id="abilities"></div>
-  </div>
-  <div class="card">
-    <div class="lbl">🛒 Shop — piggy bank: <b id="bankAmt">0</b> 🪙 <span style="font-size:11px">(coins bank after every run)</span></div>
+  <div class="card pane hidden" id="pane-shop">
+    <div class="lbl">Piggy bank: <b id="bankAmt">0</b> 🪙 <span style="font-size:11px">(coins bank after every run)</span></div>
     <div class="row" id="shopRow"></div>
   </div>
-  <div class="card">
-    <div class="lbl">Sound</div>
+  <div class="card pane hidden" id="pane-sound">
     <div class="row">
       <button class="chip" id="musTog">🎵 Music: ON</button>
       <button class="chip" id="sfxTog">🔊 Sound FX: ON</button>
     </div>
   </div>
 
-  <button class="play" id="playBtn">PLAY ▶</button>
-  <button class="play rush" id="rushBtn">👑 BOSS RUSH</button>
-  <button class="play rush" id="dailyBtn" style="background:linear-gradient(180deg,#8ae0ff,#3a8ae0);color:#082a4a">🎲 DAILY</button>
-  <div class="sub" style="margin-top:10px">Move: ◀ ▶ / arrows · Jump: ▲ / Space · Power: ✦ / Shift</div>
+  <div class="sub" style="margin-top:8px">Move: ◀ ▶ / arrows · Jump: ▲ / Space · Power: ✦ / Shift</div>
 </div>
 
 <div class="overlay hidden" id="victoryScreen">
@@ -142,7 +149,7 @@
 </div>
 
 <script>
-const APP_VERSION='v20';
+const APP_VERSION='v21';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -168,7 +175,7 @@ let sel={ color:COLORS[3], hat:'cap', abil:new Set(['double']) };
 let menuLevel=0;
 try{ const s=JSON.parse(localStorage.getItem('hopHero')||'null'); if(s){ sel.color=s.color||sel.color; sel.hat=s.hat||sel.hat; sel.abil=new Set(s.abil||['double']); if(typeof s.level==='number') menuLevel=s.level; sel.remix=!!s.remix; } }catch(e){}
 function saveHero(){ try{ localStorage.setItem('hopHero', JSON.stringify({color:sel.color,hat:sel.hat,abil:[...sel.abil],level:menuLevel,remix:!!sel.remix})); }catch(e){} }
-function has(a){ return sel.abil.has(a); }
+function has(a){ return true; }   // every ability is always on — no picker, full power
 
 // ---------- levels ----------
 // 22 hand-built worlds, each with its own layout AND art theme.
@@ -1810,12 +1817,13 @@ function buildMenu(){
       else if(it.kind==='color'){ sel.color=it.col; saveHero(); }
       saveShop(); buildMenu(); };
     sr.appendChild(d); });
+  document.getElementById('playSel').textContent='🗺️ '+(menuLevel+1)+'· '+LEVELS[menuLevel].name+(sel.remix?' 🔀 remix':'');
   const lw=document.getElementById('levels'); lw.innerHTML='';
   LEVELS.forEach((lv,i)=>{ const d=document.createElement('div'); d.className='chip'+(i===menuLevel?' sel':'');
     const gn=(gemStore[i]||[]).filter(Boolean).length;
     const md=timeStore[i]!=null?medalFor(i,timeStore[i]):'';
     d.textContent=(i+1)+'· '+lv.name+(gn?' 💎'+gn:'')+(md?' '+md:'');
-    d.onclick=()=>{ menuLevel=i; [...lw.children].forEach(x=>x.classList.remove('sel')); d.classList.add('sel'); saveHero(); }; lw.appendChild(d); });
+    d.onclick=()=>{ menuLevel=i; saveHero(); buildMenu(); }; lw.appendChild(d); });
   const cw=document.getElementById('colors'); cw.innerHTML='';
   COLORS.forEach(c=>{ const d=document.createElement('div'); d.className='sw'+(c===sel.color?' sel':''); d.style.background=c;
     d.onclick=()=>{ sel.color=c; [...cw.children].forEach(x=>x.classList.toggle('sel',x===d)); saveHero(); }; cw.appendChild(d); });
@@ -1824,19 +1832,11 @@ function buildMenu(){
     d.className='chip'+(h.id===sel.hat?' sel':''); d.style.opacity=open?'':'0.45';
     d.textContent=open ? h.ic+' '+h.nm+(h.pw?' · '+h.pw:'') : '🔒 '+h.ic+' '+h.nm+' — '+h.hint;
     d.onclick=()=>{ if(!hatOpen(h)) return; sel.hat=h.id; [...hw.children].forEach(x=>x.classList.remove('sel')); d.classList.add('sel'); saveHero(); }; hw.appendChild(d); });
-  const aw=document.getElementById('abilities'); aw.innerHTML='';
-  ABILITIES.forEach(ab=>{ const d=document.createElement('div'); d.dataset.id=ab.id;
-    d.innerHTML='<span class="ic">'+ab.ic+'</span><span><span class="nm">'+ab.nm+'</span><br><span class="de">'+ab.de+'</span></span>';
-    d.className='abil'+(has(ab.id)?' sel':'');
-    d.onclick=()=>{ if(sel.abil.has(ab.id)) sel.abil.delete(ab.id); else { if(sel.abil.size>=BUDGET) return; sel.abil.add(ab.id); } saveHero(); refreshAbil(); };
-    aw.appendChild(d); });
-  refreshAbil();
 }
-function refreshAbil(){
-  document.getElementById('budget').textContent='Points: '+sel.abil.size+' / '+BUDGET;
-  document.querySelectorAll('.abil').forEach(d=>{ const id=d.dataset.id; const on=sel.abil.has(id);
-    d.classList.toggle('sel',on); d.classList.toggle('dis', !on && sel.abil.size>=BUDGET); });
-}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('sel',x===t));
+  document.querySelectorAll('.pane').forEach(pn=>pn.classList.toggle('hidden', pn.id!=='pane-'+t.dataset.pane));
+});
 document.getElementById('playBtn').onclick=()=>startGame(menuLevel);
 document.getElementById('nextBtn').onclick=()=>startGame(curLevel+1);
 document.getElementById('againBtn').onclick=()=>rushMode?startRush():dailyMode?startDaily():startGame(curLevel);
@@ -1844,7 +1844,7 @@ document.getElementById('rushBtn').onclick=()=>{ saveHero(); startRush(); };
 document.getElementById('dailyBtn').onclick=()=>{ saveHero(); startDaily(); };
 const remixTogEl=document.getElementById('remixTog');
 function updRemixUI(){ remixTogEl.textContent='🔀 Remix: '+(sel.remix?'ON':'OFF')+(sel.remix?' — mirrored & spicy!':''); remixTogEl.classList.toggle('sel',!!sel.remix); }
-remixTogEl.onclick=()=>{ sel.remix=!sel.remix; saveHero(); updRemixUI(); };
+remixTogEl.onclick=()=>{ sel.remix=!sel.remix; saveHero(); updRemixUI(); buildMenu(); };
 updRemixUI();
 document.getElementById('overMenu').onclick=toMenu;
 document.getElementById('menuBtn').onclick=toMenu;
