@@ -142,7 +142,7 @@
 </div>
 
 <script>
-const APP_VERSION='v19';
+const APP_VERSION='v20';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -735,7 +735,12 @@ function buildLevel(idx, defO){
   for(const fr of [0.3,0.65]){ let tx=openCol(Math.round(W*fr),9,usedCols);       // bounce springs launch high — keep the sky clear
     if(tx<0) tx=safeCol(Math.round(W*fr),usedCols);
     if(tx>=0){ usedCols.push(tx-1,tx,tx+1); const r=floorRow(tx); springs.push({x:tx*TILE+4,y:r*TILE-14,w:TILE-8,h:14,t:0}); } }
-  { const tx=safeCol(Math.round(W*0.08),usedCols);                                // 🛹 skateboard right near the start
+  { let tx=-1;                                                                    // 🛹 skateboard: needs a spike-free runway ahead (it auto-cruises)
+    for(let d=0;d<W&&tx<0;d++) for(const cand of [Math.round(W*0.08)+d,Math.round(W*0.08)-d]){
+      if(cand<4||cand>W-8) continue; if(usedCols.includes(cand)) continue;
+      if(floorRow(cand)<0) continue; if(!clearOfStuff(cand)) continue;
+      if(spikes.some(s=>{ const sx3=s.x/TILE; return sx3>=cand-3&&sx3<=cand+10; })) continue;
+      tx=cand; break; }
     if(tx>=0){ usedCols.push(tx-1,tx,tx+1);
       skate={x:tx*TILE+4, y:floorRow(tx)*TILE-10, state:'idle', spinT:0}; } }
   { const tx=safeCol(Math.round(W*0.18),usedCols);                                // 🐸 frog mount waits early on
@@ -919,9 +924,10 @@ function update(dt){
   const a=pl.onGround?ACC:AIRACC, run2=riding?340:RUN;
   if(pl.blastT>0){ pl.blastT-=dt; if(pl.onGround) pl.blastT=0; }   // cannon-blast momentum lasts until touchdown
   if(pl.dashT>0){ pl.dashT-=dt; pl.vx=DASH_SPD*pl.face; }
+  else if(riding && pl.blastT<=0){ pl.vx+=(run2*pl.face-pl.vx)*Math.min(1,dt*5); }   // 🛹 auto-cruise; press the other way to turn
   else{
     if(dir){ pl.vx+=dir*a*dt; const cap=pl.blastT>0?Math.max(run2,Math.abs(pl.vx)):run2; pl.vx=Math.max(-cap,Math.min(cap,pl.vx)); }
-    else if(pl.blastT<=0){ const f=FRIC*(riding&&(pl.onGround||pl.coyote>0)?0.3:1)*dt; if(pl.vx>0) pl.vx=Math.max(0,pl.vx-f); else pl.vx=Math.min(0,pl.vx+f); }   // boards coast; blasts fly friction-free
+    else if(pl.blastT<=0){ const f=FRIC*dt; if(pl.vx>0) pl.vx=Math.max(0,pl.vx-f); else pl.vx=Math.min(0,pl.vx+f); }   // blasts fly friction-free
   }
   // act button: star shot (if you have ammo), else dash / ground-pound
   if(keys.actEdge){ keys.actEdge=false;
