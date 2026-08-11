@@ -166,7 +166,7 @@
 </div>
 
 <script>
-const APP_VERSION='v24';
+const APP_VERSION='v25';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -244,8 +244,10 @@ let doorA=null, doorB=null, warpT=0, warpCd=0;          // 🚪 warp door + coin
 let levelT=0;                                           // ⏱ time attack clock
 let timeStore={};                                       // best times per level
 try{ timeStore=JSON.parse(localStorage.getItem('hopTimes')||'{}')||{}; }catch(e){}
+try{ if(!localStorage.getItem('hopLen2')){   // one-time reset: old times/ghosts are from half-length levels
+  localStorage.removeItem('hopTimes'); localStorage.removeItem('hopGhosts'); timeStore={}; localStorage.setItem('hopLen2','1'); } }catch(e){}
 function saveTimes(){ try{ localStorage.setItem('hopTimes', JSON.stringify(timeStore)); }catch(e){} }
-function medalFor(i,t){ const w=LEVELS[i].W; return t<=w*0.35?'🥇':t<=w*0.55?'🥈':t<=w*0.9?'🥉':''; }
+function medalFor(i,t){ const w=LEVELS[i].W*2-6; return t<=w*0.35?'🥇':t<=w*0.55?'🥈':t<=w*0.9?'🥉':''; }   // levels run two laps now
 function fmtT(t){ return Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0'); }
 function totalGems(){ let n=0; for(const k in gemStore) n+=(gemStore[k]||[]).filter(Boolean).length; return n; }
 function goldCount(){ let n=0; for(const k in timeStore) if(medalFor(+k,timeStore[k])==='🥇') n++; return n; }
@@ -747,6 +749,18 @@ function buildLevel(idx, defO){
     spikes.forEach(s=>s.x=WT-s.x-TILE);
     boxes.forEach(b=>b.x=WT-b.x-b.w);
   }
+  // twice the journey: weld a second lap of the layout after the first
+  const W0=W, lapOff=W0-6;
+  W=W0*2-6;
+  { const g2=Array.from({length:H},()=>new Array(W).fill(0));
+    for(let r=0;r<H;r++) for(let x=0;x<W0;x++) if(grid[r][x]){ g2[r][x]=grid[r][x]; g2[r][lapOff+x]=grid[r][x]; }
+    grid=g2;
+    const offPx=lapOff*TILE;
+    coins=coins.concat(coins.map(c=>({x:c.x+offPx, y:c.y, got:false})));
+    enemies=enemies.concat(enemies.map(en=>{ const e2=Object.assign({},en); e2.x=en.x+offPx; return e2; }));
+    spikes=spikes.concat(spikes.map(s=>({x:s.x+offPx, y:s.y})));
+    boxes=boxes.concat(boxes.map(b=>({x:b.x+offPx, y:b.y, w:b.w, h:b.h, open:false})));
+  }
   // ---- auto-placed features: every level gets springs, movers, a checkpoint, gems + a wonder flower ----
   const floorRow=tx=>{ for(let r=H-1;r>=SKY;r--){ if(grid[r][tx] && !(r>0&&grid[r-1][tx])) return r; } return -1; };
   const clearOfStuff=tx=>!spikes.some(s=>Math.abs(s.x/TILE-tx)<2)&&!boxes.some(b=>Math.abs(b.x/TILE-tx)<2)&&!enemies.some(e=>e.type==='shoot'&&Math.abs(e.x/TILE-tx)<2);
@@ -809,10 +823,10 @@ function buildLevel(idx, defO){
     if(spot) wonder={x:spot[1]*TILE+TILE/2,y:spot[0]*TILE-24,used:false};
   }
   // start & flag columns — remix re-derives them from the mirrored floor instead of per-level overrides
-  let fxc=def.flagX!=null?def.flagX:(W-4), ftc=def.flagTop!=null?def.flagTop:GT;
+  let fxc=def.flagX!=null?def.flagX+lapOff:(W-4), ftc=def.flagTop!=null?def.flagTop:GT;
   let sxc=def.startX!=null?def.startX:2, stc=def.startTop!=null?def.startTop:GT;
   if(remixOn){
-    fxc=W-4; for(let tx=W-4;tx>W*0.7;tx--){ if(floorRow(tx)>=0){ fxc=tx; break; } }
+    fxc=W-4; for(let tx=W-4;tx>W*0.7;tx--){ const fr2=floorRow(tx); if(fr2>=0&&floorRow(tx-1)===fr2&&floorRow(tx-2)===fr2){ fxc=tx; break; } }   // boss needs footing too
     if(floorRow(fxc)>=0) ftc=floorRow(fxc)-SKY;
     sxc=2; for(let tx=2;tx<W*0.3;tx++){ if(floorRow(tx)>=0){ sxc=tx; break; } }
     if(floorRow(sxc)>=0) stc=floorRow(sxc)-SKY;
@@ -821,7 +835,7 @@ function buildLevel(idx, defO){
   if(def.boss){
     const cfg=def.boss;
     const big=cfg.hp>=6, bw=big?76:60, bh=big?66:52;
-    boss={ x:(cfg.x!=null&&!remixOn?cfg.x:fxc-2)*TILE, y:(ftc+SKY)*TILE-bh, w:bw, h:bh,
+    boss={ x:(cfg.x!=null&&!remixOn?cfg.x+lapOff:fxc-2)*TILE, y:(ftc+SKY)*TILE-bh, w:bw, h:bh,
            hp:cfg.hp, maxHp:cfg.hp, nm:cfg.nm, col:cfg.col, shots:cfg.shots, hop:cfg.hop||(big?140:110),
            active:false, alive:true, vx:0, vy:0, onGround:false, hopT:1.2, shotT:4, inv:0, face:-1 };
   }
@@ -1250,7 +1264,7 @@ function update(dt){
   if(!rushMode) levelT+=dt;
   // ghost recorder (10Hz, normal runs only)
   if(!rushMode && !remixOn){ recT+=dt;
-    while(recT>=0.1){ recT-=0.1; if(ghostRec.length<6000){ ghostRec.push(Math.round(pl.x),Math.round(pl.y)); } } }
+    while(recT>=0.1){ recT-=0.1; if(ghostRec.length<12000){ ghostRec.push(Math.round(pl.x),Math.round(pl.y)); } } }
   // skateboard 🛹
   if(skate){
     if(skate.spinT>0) skate.spinT-=dt;
@@ -1906,14 +1920,14 @@ function win(){ sfx('win'); bank+=coinsGot; saveBank();
     o.classList.remove('hidden'); return; }
   if(curLevel>=LEVELS.length-1){ const tf=Math.round(levelT);
     if(!rushMode && !remixOn && (timeStore[curLevel]==null||tf<timeStore[curLevel])){ timeStore[curLevel]=tf; saveTimes();
-      ghostStoreObj[curLevel]=ghostRec.slice(0,6000); saveGhosts(); }
+      ghostStoreObj[curLevel]=ghostRec.slice(0,12000); saveGhosts(); }
     showVictory(); return; }
   setTrack(null);
   const o=document.getElementById('overScreen'), rt=document.getElementById('resultText');
   rt.className='big win'; rt.textContent='LEVEL CLEAR! 🏁';
   const t=Math.round(levelT), med=medalFor(curLevel,t), old=timeStore[curLevel];
   if(!remixOn && (old==null||t<old)){ timeStore[curLevel]=t; saveTimes();
-    ghostStoreObj[curLevel]=ghostRec.slice(0,6000); saveGhosts(); }   // your best run becomes the ghost to race
+    ghostStoreObj[curLevel]=ghostRec.slice(0,12000); saveGhosts(); }   // your best run becomes the ghost to race
   let rivalNote='';
   if(rival){ if(!rival.done){ bank+=25; saveBank(); rivalNote=' You beat the rival! +25 🪙 bonus.'; } else rivalNote=' The rival got there first! 😜'; }
   const best=timeStore[curLevel];
