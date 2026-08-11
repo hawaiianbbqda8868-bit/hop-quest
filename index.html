@@ -918,7 +918,7 @@ function update(dt){
   // loaded in a cannon: barrel sweeps its aim, jump fires
   if(pl.inCannon){ const b2=pl.inCannon;
     b2.ang+=b2.angV*dt; if(b2.ang<0.35){ b2.ang=0.35; b2.angV*=-1; } if(b2.ang>2.79){ b2.ang=2.79; b2.angV*=-1; }
-    pl.x=b2.x-pl.w/2; pl.y=b2.y-pl.h/2-6; pl.vx=0; pl.vy=0; pl.pounding=false;
+    pl.x=b2.x-pl.w/2; pl.y=b2.y+9-pl.h; pl.vx=0; pl.vy=0; pl.pounding=false;   // feet pinned above the barrel base so big heroes launch clean too
     if(pl.jumpBuf>0){ pl.jumpBuf=0; const sp=1400;
       pl.vx=Math.cos(b2.ang)*sp; pl.vy=-Math.abs(Math.sin(b2.ang))*sp;
       pl.face=pl.vx>=0?1:-1; pl.inCannon=null; b2.cd=1.5; pl.jumps=1; pl.coyote=0; pl.blastT=4;
