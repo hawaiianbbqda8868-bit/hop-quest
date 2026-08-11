@@ -159,7 +159,7 @@ function saveHero(){ try{ localStorage.setItem('hopHero', JSON.stringify({color:
 function has(a){ return sel.abil.has(a); }
 
 // ---------- levels ----------
-// 5 hand-built worlds, each with its own layout AND art theme.
+// 22 hand-built worlds, each with its own layout AND art theme.
 let W, H, grid, coins, enemies, spikes, projectiles, boxes, presents, toasts, boss, flag, startPx, curTheme, curName, curLevel=0;
 
 const LEVELS=[
@@ -365,6 +365,208 @@ const LEVELS=[
       L.coin(66,-6,5); L.coin(82,-6,5); L.coin(58,-5,4);
       L.fly(70,-1); L.fly(86,-1);
       L.box(27,6); L.box(107,6); L.box(187,6);
+    } },
+  { name:'Sandy Dunes', W:190, music:'cheery', boss:{nm:'SAND SULTAN', col:'#c8963a', hp:3, shots:0},
+    theme:{ sky:['#ffdf9a','#fff3d0'], hillA:'#eccd7f', hillB:'#d9b45e', dirt:'#a97b3f', cap:'#f2d98c', platA:'#d9a858', platB:'#a97838', spike:'#efe3c4' },
+    build(L){
+      L.ground([[26,28],[52,54],[78,80],[104,106],[130,132],[156,158]]);
+      L.plat(10,7,4); L.plat(18,5,4); L.plat(32,7,4); L.plat(40,5,4); L.plat(58,7,4); L.plat(66,5,4);
+      L.plat(84,7,4); L.plat(92,5,4); L.plat(110,7,4); L.plat(118,5,4); L.plat(136,7,4); L.plat(144,5,4);
+      L.plat(162,7,4); L.plat(170,5,4); L.plat(180,7,4);
+      L.coin(11,6,4); L.coin(19,4,4); L.coin(33,6,4); L.coin(41,4,4); L.coin(59,6,4); L.coin(67,4,4);
+      L.coin(85,6,4); L.coin(93,4,4); L.coin(111,6,4); L.coin(119,4,4); L.coin(137,6,4); L.coin(145,4,4);
+      L.coin(163,6,4); L.coin(171,4,4); L.coin(6,9,4); L.coin(74,9,3); L.coin(126,9,3); L.coin(181,6,3);
+      [14,34,62,88,116,142,172].forEach(x=>L.en(x));
+      L.jump(20); L.jump(46); L.jump(70); L.jump(98); L.jump(124); L.jump(150); L.jump(178);
+      L.spk(44,2); L.spk(68,2); L.spk(96,2); L.spk(120,2); L.spk(148,2); L.spk(166,2);
+      // dune-top route
+      L.plat(24,3,3); L.plat(30,1,3); L.plat(36,-1,3); L.plat(42,-3,4); L.plat(50,-4,5); L.plat(58,-3,4); L.plat(66,-4,5); L.plat(74,-3,4);
+      L.coin(50,-6,5); L.coin(66,-6,5); L.coin(42,-5,4);
+      L.fly(54,-1); L.fly(70,-1);
+      L.box(11,6); L.box(85,6); L.box(163,6);
+    } },
+  { name:'Coral Cove', W:185, music:'breezy', boss:{nm:'REEF RULER', col:'#ff7a5a', hp:3, shots:0, hop:60},
+    theme:{ sky:['#8fd8ff','#e0f6ff'], hillA:'#ffe1a8', hillB:'#f5cf88', dirt:'#d8b478', cap:'#f5e0a8', platA:'#ff9a6a', platB:'#d86a4a', spike:'#b8ecf5', hazard:'#38b6f0' },
+    build(L){
+      L.ground([[20,22],[38,40],[56,58],[74,76],[92,94],[110,112],[128,130],[146,148],[164,166]]);
+      L.plat(12,6,3); L.plat(26,7,3); L.plat(34,5,3); L.plat(44,6,3); L.plat(62,7,3); L.plat(70,5,3);
+      L.plat(80,6,3); L.plat(98,7,3); L.plat(106,5,3); L.plat(116,6,3); L.plat(134,7,3); L.plat(142,5,3);
+      L.plat(152,6,3); L.plat(170,7,3); L.plat(178,5,3);
+      L.coin(12,5,3); L.coin(27,6,3); L.coin(35,4,3); L.coin(44,5,3); L.coin(63,6,3); L.coin(71,4,3);
+      L.coin(80,5,3); L.coin(99,6,3); L.coin(107,4,3); L.coin(116,5,3); L.coin(135,6,3); L.coin(143,4,3);
+      L.coin(152,5,3); L.coin(171,6,3); L.coin(179,4,3); L.coin(6,9,4);
+      [8,46,82,118,154].forEach(x=>L.en(x));
+      L.jump(12); L.jump(32); L.jump(66); L.jump(102); L.jump(138); L.jump(170);
+      L.fly(28); L.fly(64); L.fly(100); L.fly(136); L.fly(160);
+      L.spk(30,2); L.spk(48,2); L.spk(84,2); L.spk(116,2); L.spk(152,2);
+      // seagull route above the surf
+      L.plat(36,3,3); L.plat(42,1,3); L.plat(48,-1,3); L.plat(54,-3,4); L.plat(62,-4,5); L.plat(70,-3,4); L.plat(78,-4,5); L.plat(86,-3,4);
+      L.coin(62,-6,5); L.coin(78,-6,5); L.coin(54,-5,4);
+      L.fly(66,-1); L.fly(82,-1);
+      L.box(13,5); L.box(81,5); L.box(153,5);
+    } },
+  { name:'Blossom Garden', W:185, music:'cheery', boss:{nm:'PETAL PRINCE', col:'#e878b0', hp:3, shots:0},
+    theme:{ sky:['#ffd6ea','#fff0f6'], hillA:'#f7b6d4', hillB:'#ee9cc2', dirt:'#8a5a40', cap:'#ffb6d8', platA:'#f090b8', platB:'#c06090', spike:'#ffe0ee' },
+    build(L){
+      L.ground([[30,32],[64,66],[98,100],[132,134],[162,164]]);
+      L.plat(10,7,4); L.plat(20,5,4); L.plat(36,7,4); L.plat(44,5,4); L.plat(54,7,4); L.plat(70,6,4);
+      L.plat(80,4,4); L.plat(90,7,4); L.plat(104,6,4); L.plat(114,4,4); L.plat(124,7,4); L.plat(138,6,4);
+      L.plat(148,4,4); L.plat(156,7,4); L.plat(168,6,4); L.plat(176,4,4);
+      L.coin(11,6,4); L.coin(21,4,4); L.coin(37,6,4); L.coin(45,4,4); L.coin(55,6,4); L.coin(71,5,4);
+      L.coin(81,3,4); L.coin(91,6,4); L.coin(105,5,4); L.coin(115,3,4); L.coin(125,6,4); L.coin(139,5,4);
+      L.coin(149,3,4); L.coin(157,6,4); L.coin(169,5,4); L.coin(177,3,4); L.coin(6,9,4); L.coin(120,9,4);
+      [18,56,90,124,156].forEach(x=>L.en(x));
+      L.jump(72); L.fly(40); L.fly(108); L.fly(148);
+      L.spk(46,2); L.spk(86,2); L.spk(140,2);
+      // petal-drift route
+      L.plat(28,3,3); L.plat(34,1,3); L.plat(40,-1,3); L.plat(46,-3,4); L.plat(54,-4,5); L.plat(62,-3,4); L.plat(70,-4,5); L.plat(78,-3,4);
+      L.coin(54,-6,5); L.coin(70,-6,5); L.coin(46,-5,4);
+      L.fly(58,-1); L.fly(74,-1);
+      L.box(11,6); L.box(91,6); L.box(169,5);
+    } },
+  { name:'Jungle Temple', W:195, music:'cave', boss:{nm:'VINE VIPER', col:'#3a8a3a', hp:4, shots:1},
+    theme:{ sky:['#2a4a2a','#4a7a3a'], hillA:'#2f5a2f', hillB:'#234723', dirt:'#4a3a26', cap:'#3f8f3f', platA:'#8a8a6a', platB:'#5a5a44', spike:'#cfe0a0' },
+    build(L){
+      L.ground([[24,26],[50,52],[76,78],[102,104],[128,130],[154,156],[176,178]]);
+      L.plat(10,7,4); L.plat(18,5,4); L.plat(30,7,4); L.plat(38,4,4); L.plat(56,7,4); L.plat(64,5,4);
+      L.plat(82,7,4); L.plat(90,4,4); L.plat(108,7,4); L.plat(116,5,4); L.plat(134,7,4); L.plat(142,4,4);
+      L.plat(160,7,4); L.plat(168,5,4); L.plat(182,7,4); L.plat(188,5,4);
+      L.coin(11,6,4); L.coin(19,4,4); L.coin(31,6,4); L.coin(39,3,4); L.coin(57,6,4); L.coin(65,4,4);
+      L.coin(83,6,4); L.coin(91,3,4); L.coin(109,6,4); L.coin(117,4,4); L.coin(135,6,4); L.coin(143,3,4);
+      L.coin(161,6,4); L.coin(169,4,4); L.coin(183,6,3); L.coin(6,9,4);
+      L.chase(34); L.chase(86); L.chase(138); L.chase(184);
+      L.shoot(42); L.shoot(94); L.shoot(146);
+      [12,60,112,164].forEach(x=>L.en(x));
+      L.fly(48); L.fly(100); L.fly(150);
+      L.spk(36,2); L.spk(70,3); L.spk(118,2); L.spk(160,2);
+      // canopy route
+      L.plat(30,3,3); L.plat(36,1,3); L.plat(42,-1,3); L.plat(48,-3,4); L.plat(56,-4,5); L.plat(64,-3,4); L.plat(72,-4,5); L.plat(80,-3,4);
+      L.coin(56,-6,5); L.coin(72,-6,5); L.coin(48,-5,4);
+      L.fly(60,-1); L.fly(76,-1);
+      L.box(11,6); L.box(83,6); L.box(161,6);
+    } },
+  { name:'Candy Canyon', W:190, music:'icy', boss:{nm:'GUMMY GOLIATH', col:'#ff6ab0', hp:4, shots:1, hop:60},
+    theme:{ sky:['#ffc8e8','#fff4d8'], hillA:'#ffb0d8', hillB:'#f79ac8', dirt:'#a86ad8', cap:'#ff8ac8', platA:'#8ae0ff', platB:'#58a8d8', spike:'#fff0f8' },
+    build(L){
+      L.ground([[22,24],[46,48],[70,72],[94,96],[118,120],[142,144],[166,168]]);
+      L.plat(10,7,4); L.plat(18,5,4); L.plat(28,7,4); L.plat(36,4,4); L.plat(52,7,4); L.plat(60,5,4);
+      L.plat(76,7,4); L.plat(84,4,4); L.plat(100,7,4); L.plat(108,5,4); L.plat(124,7,4); L.plat(132,4,4);
+      L.plat(148,7,4); L.plat(156,5,4); L.plat(172,7,4); L.plat(180,5,4);
+      L.coin(11,6,4); L.coin(19,4,4); L.coin(29,6,4); L.coin(37,3,4); L.coin(53,6,4); L.coin(61,4,4);
+      L.coin(77,6,4); L.coin(85,3,4); L.coin(101,6,4); L.coin(109,4,4); L.coin(125,6,4); L.coin(133,3,4);
+      L.coin(149,6,4); L.coin(157,4,4); L.coin(173,6,4); L.coin(181,4,4); L.coin(6,9,4);
+      L.jump(14); L.jump(30); L.jump(54); L.jump(78); L.jump(102); L.jump(126); L.jump(150); L.jump(174);
+      [38,86,134].forEach(x=>L.en(x));
+      L.fly(62); L.fly(110); L.fly(158);
+      L.spk(34,2); L.spk(82,2); L.spk(130,2); L.spk(178,2);
+      // lollipop-top route
+      L.plat(26,3,3); L.plat(32,1,3); L.plat(38,-1,3); L.plat(44,-3,4); L.plat(52,-4,5); L.plat(60,-3,4); L.plat(68,-4,5); L.plat(76,-3,4);
+      L.coin(52,-6,5); L.coin(68,-6,5); L.coin(44,-5,4);
+      L.fly(56,-1); L.fly(72,-1);
+      L.box(11,6); L.box(101,6); L.box(173,6);
+    } },
+  { name:'Sunken Ship', W:180, music:'cave', boss:{nm:'KRAKEN CAPTAIN', col:'#3a6a8a', hp:4, shots:1},
+    theme:{ sky:['#0e2438','#1d4258'], hillA:'#16324a', hillB:'#0e263a', dirt:'#3a4a52', cap:'#4a7a8a', platA:'#8a6a4a', platB:'#5a4028', spike:'#a8d8e8' },
+    build(L){
+      L.ground([[26,27],[50,51],[74,75],[98,99],[122,123],[148,149]]);
+      L.ceiling();
+      L.plat(9,8,3); L.plat(15,6,3); L.plat(21,8,3); L.plat(30,7,2); L.plat(36,5,4); L.plat(44,7,3);
+      L.plat(54,5,3); L.plat(60,7,2); L.plat(66,8,3); L.plat(78,6,4); L.plat(86,7,2); L.plat(92,8,3);
+      L.plat(102,6,4); L.plat(110,5,3); L.plat(116,7,3); L.plat(126,5,4);
+      L.plat(134,7,3); L.plat(140,5,4); L.plat(152,7,3); L.plat(160,6,4); L.plat(168,4,4);
+      L.coin(10,7,3); L.coin(16,5,3); L.coin(37,4,4); L.coin(55,4,3); L.coin(79,5,3); L.coin(103,5,3);
+      L.coin(111,4,3); L.coin(127,4,3); L.coin(22,7,3); L.coin(67,7,3);
+      L.coin(135,6,3); L.coin(141,4,4); L.coin(153,6,3); L.coin(161,5,4); L.coin(168,3,4);
+      [12,20,44,68,92,116,140,164].forEach(x=>L.en(x));
+      L.shoot(30); L.shoot(78); L.shoot(126); L.shoot(158);
+      L.fly(36); L.fly(88); L.fly(132);
+      L.spk(42,2); L.spk(66,2); L.spk(108,2); L.spk(144,2);
+      // rigging route below the hull
+      L.plat(20,4,3); L.plat(26,2,3); L.plat(32,0,3); L.plat(38,-2,4); L.plat(46,-3,5); L.plat(54,-2,4); L.plat(62,-3,5); L.plat(70,-2,4);
+      L.coin(46,-5,5); L.coin(62,-5,5); L.coin(38,-4,4);
+      L.fly(50,0); L.fly(66,0);
+      L.box(10,7); L.box(67,7); L.box(135,6);
+    } },
+  { name:'Haunted Hollow', W:195, music:'danger', boss:{nm:'GHOST GOURD', col:'#b070e0', hp:4, shots:1},
+    theme:{ sky:['#1c1428','#382450'], hillA:'#2a1e3c', hillB:'#1e1630', dirt:'#3a3040', cap:'#5a4a70', platA:'#6a5a80', platB:'#40345a', spike:'#c8f0a0', hazard:'#8a4ae8' },
+    build(L){
+      L.ground([[18,20],[42,44],[66,68],[90,92],[114,116],[138,140],[160,162]]);
+      L.plat(10,6,3); L.plat(24,7,3); L.plat(32,5,3); L.plat(48,6,3); L.plat(56,4,3); L.plat(72,7,3);
+      L.plat(80,5,3); L.plat(96,6,3); L.plat(104,4,3); L.plat(120,7,3); L.plat(128,5,3); L.plat(144,6,3);
+      L.plat(152,4,3); L.plat(166,7,3); L.plat(174,5,3); L.plat(184,7,3);
+      L.coin(10,5,3); L.coin(25,6,3); L.coin(33,4,3); L.coin(49,5,3); L.coin(57,3,3); L.coin(73,6,3);
+      L.coin(81,4,3); L.coin(97,5,3); L.coin(105,3,3); L.coin(121,6,3); L.coin(129,4,3); L.coin(145,5,3);
+      L.coin(153,3,3); L.coin(167,6,3); L.coin(175,4,3); L.coin(185,6,3);
+      L.fly(24); L.fly(48); L.fly(72); L.fly(96); L.fly(120); L.fly(144); L.fly(168); L.fly(186);
+      L.chase(30); L.chase(78); L.chase(126); L.chase(174);
+      [14,60,110,158].forEach(x=>L.en(x));
+      L.spk(38,2); L.spk(84,3); L.spk(132,2); L.spk(156,2); L.spk(176,2);
+      // spirit route
+      L.plat(38,3,3); L.plat(44,1,3); L.plat(50,-1,3); L.plat(56,-3,4); L.plat(64,-4,5); L.plat(72,-3,4); L.plat(80,-4,5); L.plat(88,-3,4);
+      L.coin(64,-6,5); L.coin(80,-6,5); L.coin(56,-5,4);
+      L.fly(68,-1); L.fly(84,-1);
+      L.box(25,6); L.box(97,5); L.box(167,6);
+    } },
+  { name:'Neon City', W:195, music:'cave', boss:{nm:'CIRCUIT CZAR', col:'#28d8b8', hp:5, shots:1},
+    theme:{ sky:['#101828','#243048'], hillA:'#1c2840', hillB:'#121c30', dirt:'#2a3242', cap:'#3ae8c8', platA:'#e84a9a', platB:'#8a2a6a', spike:'#7af0ff' },
+    build(L){
+      L.ground([[26,28],[54,56],[82,84],[110,112],[138,140],[166,168]]);
+      L.plat(12,7,5); L.plat(22,5,4); L.plat(36,7,5); L.plat(46,5,4); L.plat(64,7,5); L.plat(74,5,4);
+      L.plat(92,7,5); L.plat(102,5,4); L.plat(120,7,5); L.plat(130,5,4); L.plat(148,7,5); L.plat(158,5,4);
+      L.plat(176,7,5); L.plat(186,5,4);
+      L.coin(13,6,5); L.coin(23,4,4); L.coin(37,6,5); L.coin(47,4,4); L.coin(65,6,5); L.coin(75,4,4);
+      L.coin(93,6,5); L.coin(103,4,4); L.coin(121,6,5); L.coin(131,4,4); L.coin(149,6,5); L.coin(159,4,4);
+      L.coin(177,6,5); L.coin(187,4,4);
+      L.shoot(20); L.shoot(48); L.shoot(76); L.shoot(104); L.shoot(132); L.shoot(160); L.shoot(184);
+      [14,42,70,98,126,154,178].forEach(x=>L.en(x));
+      L.chase(60); L.chase(116); L.chase(172);
+      L.fly(32); L.fly(88); L.fly(144);
+      L.spk(50,2); L.spk(106,2); L.spk(162,2);
+      // skyway route
+      L.plat(30,3,3); L.plat(36,1,3); L.plat(42,-1,3); L.plat(48,-3,4); L.plat(56,-4,5); L.plat(64,-3,4); L.plat(72,-4,5); L.plat(80,-3,4);
+      L.coin(56,-6,5); L.coin(72,-6,5); L.coin(48,-5,4);
+      L.fly(60,-1); L.fly(76,-1);
+      L.box(13,6); L.box(93,6); L.box(177,6);
+    } },
+  { name:'Moonlight Craters', W:185, cloudy:true, music:'breezy', boss:{nm:'LUNAR LOOMER', col:'#9aa0c0', hp:5, shots:1, hop:60},
+    theme:{ sky:['#0c1024','#2a3050'], hillA:null, hillB:null, dirt:'#8a8a98', cap:'#c8c8d8', platA:'#a8a8b8', platB:'#70707e', spike:'#e8e8f4' },
+    startX:2, startTop:9, flagX:172, flagTop:9,
+    build(L){
+      const isl=[[0,9,6],[10,8,4],[18,9,4],[26,7,4],[34,9,4],[42,8,4],[50,9,4],[58,7,4],[66,9,4],[74,8,4],
+        [82,9,4],[90,7,4],[98,9,4],[106,8,4],[114,9,4],[122,7,4],[130,9,4],[138,8,4],[146,9,4],[154,7,4],[162,9,5],[170,9,6]];
+      isl.forEach(([x,y,w])=>L.island(x,y,w));
+      L.coin(2,8,4); L.coin(11,7,4); L.coin(27,6,4); L.coin(35,8,4); L.coin(51,8,3); L.coin(59,6,4);
+      L.coin(75,7,4); L.coin(91,6,4); L.coin(107,7,4); L.coin(123,6,4); L.coin(139,7,4); L.coin(155,6,4); L.coin(163,8,4);
+      L.coin(30,4,3); L.coin(62,4,3); L.coin(94,4,3); L.coin(126,4,3); L.coin(157,4,3);
+      L.fly(14); L.fly(38); L.fly(62); L.fly(86); L.fly(110); L.fly(134); L.fly(158);
+      L.en(27,6); L.en(75,7); L.en(123,6); L.en(155,6);
+      // starlight route
+      L.island(28,4,3); L.island(33,2,3); L.island(38,0,3); L.island(43,-2,3); L.island(50,-3,4); L.island(58,-4,4); L.island(66,-3,4); L.island(74,-4,4); L.island(82,-3,4);
+      L.coin(58,-6,4); L.coin(74,-6,4); L.coin(43,-4,3);
+      L.fly(54,-1); L.fly(70,-2);
+      L.box(2,8); L.box(83,8); L.box(163,8);
+    } },
+  { name:'Golden Citadel', W:205, music:'finale', boss:{nm:'GILDED GENERAL', col:'#d8a828', hp:5, shots:2},
+    theme:{ sky:['#f0c460','#fff0c0'], hillA:'#e0b858', hillB:'#c89c40', dirt:'#8a6a2a', cap:'#ffd54a', platA:'#e8c060', platB:'#b08a30', spike:'#fff0c0' },
+    build(L){
+      L.ground([[22,24],[46,48],[70,72],[94,96],[118,120],[142,144],[166,168],[186,188]]);
+      L.plat(10,7,4); L.plat(18,5,4); L.plat(28,7,4); L.plat(36,4,4); L.plat(52,7,4); L.plat(60,5,4);
+      L.plat(76,7,4); L.plat(84,4,4); L.plat(100,7,4); L.plat(108,5,4); L.plat(124,7,4); L.plat(132,4,4);
+      L.plat(148,7,4); L.plat(156,5,4); L.plat(172,7,4); L.plat(180,4,4); L.plat(192,7,4); L.plat(198,5,4);
+      L.coin(11,6,4); L.coin(19,4,4); L.coin(29,6,4); L.coin(37,3,4); L.coin(53,6,4); L.coin(61,4,4);
+      L.coin(77,6,4); L.coin(85,3,4); L.coin(101,6,4); L.coin(109,4,4); L.coin(125,6,4); L.coin(133,3,4);
+      L.coin(149,6,4); L.coin(157,4,4); L.coin(173,6,4); L.coin(181,3,4); L.coin(193,6,4); L.coin(6,9,4);
+      [12,58,104,150,192].forEach(x=>L.en(x));
+      L.jump(18); L.jump(64); L.jump(110); L.jump(156);
+      L.chase(40); L.chase(86); L.chase(132); L.chase(178);
+      L.fly(30); L.fly(76); L.fly(122); L.fly(168); L.fly(196);
+      L.shoot(52); L.shoot(98); L.shoot(140); L.shoot(190);
+      L.spk(36,2); L.spk(82,2); L.spk(128,2); L.spk(174,2);
+      // rampart route
+      L.plat(44,2,3); L.plat(50,0,3); L.plat(56,-2,3); L.plat(62,-4,4); L.plat(70,-5,5); L.plat(78,-4,4); L.plat(86,-5,5); L.plat(94,-4,4);
+      L.coin(70,-7,5); L.coin(86,-7,5); L.coin(62,-6,4);
+      L.fly(74,-2); L.fly(90,-2);
+      L.box(11,6); L.box(101,6); L.box(193,6);
     } },
   { name:'Rainbow Summit', W:215, music:'finale', boss:{nm:'RAINBOW KING', col:'#b05ac0', hp:6, shots:3},
     theme:{ sky:['#ff9ec8','#ffe0a0'], hillA:'#b0e0ff', hillB:'#ffc0e0', dirt:'#a06ac0', cap:'#ffd54a', platA:'#7ad0ff', platB:'#c86ad0', spike:'#ffffff' },
