@@ -206,7 +206,7 @@
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
-const APP_VERSION='v31';
+const APP_VERSION='v32';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -1034,9 +1034,8 @@ const mp={peer:null, conns:[], hostConn:null, isHost:false, active:false, connec
 function famId(){ let h=0; const s2=(location.host||'hopquest')+'/hq'; for(const ch of s2) h=(h*31+ch.charCodeAt(0))>>>0; return 'hopquest-fam-'+h.toString(36); }
 const MP_RTC={ config:{ iceServers:[
   {urls:'stun:stun.l.google.com:19302'},
-  {urls:'turn:openrelay.metered.ca:80', username:'openrelayproject', credential:'openrelayproject'},
-  {urls:'turn:openrelay.metered.ca:443', username:'openrelayproject', credential:'openrelayproject'}
-]}};
+  {urls:'stun:stun1.l.google.com:19302'}
+]}};   // (the old free TURN relays are dead — same-network play uses direct links)
 function mpStatus(t){ const el=document.getElementById('mpStatus'); if(el) el.textContent=t; }
 function updHostRow(){ document.getElementById('mpHostRow').style.display=(mp.active&&mp.isHost)?'':'none'; }
 function mpAutoJoin(){
@@ -1045,7 +1044,7 @@ function mpAutoJoin(){
   mp.connecting=true; mpStatus('Connecting to the family room…');
   const id=famId();
   const pr=new Peer(id, MP_RTC);
-  pr.on('open',()=>{ mp.peer=pr; mp.isHost=true; mp.active=true; mp.connecting=false; mp.myId=0; mp.nextId=1; mp.players={};
+  pr.on('open',()=>{ mp.peer=pr; mp.isHost=true; mp.active=true; mp.connecting=false; mp.claimTries=0; mp.myId=0; mp.nextId=1; mp.players={};
     mpStatus('🏠 You opened the family room! You are the leader — others just tap 🌐 FAMILY.'); updHostRow(); });
   pr.on('connection',c=>{ if(!mp.isHost) return; mpHostAccept(c); });
   pr.on('error',e=>{
@@ -1060,10 +1059,22 @@ function mpGuestConnect(g,id,tries){
   const c=g.connect(id); mp.hostConn=c; mpGuestWire(c);
   setTimeout(()=>{ if(mp.hostConn===c && !c.open && !mp.active){
     try{ c.close(); }catch(_){}
-    if(tries<3){ mpStatus('Still connecting… (try '+(tries+2)+')'); mpGuestConnect(g,id,tries+1); }
-    else { mp.connecting=false; mpStatus('Could not reach the leader — tap RETRY.'); }
+    if(tries<2){ mpStatus('Found the room, connecting… (try '+(tries+2)+')'); mpGuestConnect(g,id,tries+1); }
+    else{ // the "leader" may be a dead old tab — drop everything and try to claim the room ourselves
+      try{ g.destroy(); }catch(_){}
+      mp.peer=null; mp.hostConn=null; mp.connecting=false;
+      mp.claimTries=(mp.claimTries||0)+1;
+      if(mp.claimTries<=4){ mpStatus('Leader not answering — trying to take over the room… ('+mp.claimTries+'/4)');
+        setTimeout(()=>mpAutoJoin(), 2500); }
+      else { mp.claimTries=0; mpStatus('Could not connect 😢 If you are on the same Wi-Fi, wait 1 minute and tap RETRY (old rooms need to expire). Status code: ICE-fail.'); }
+    }
   } }, 4500);
 }
+// leaving the page (or backgrounding on a phone) frees the room so no zombie leaders linger
+function mpShutdown(){ try{ if(mp.peer) mp.peer.destroy(); }catch(_){}
+  mp.peer=null; mp.hostConn=null; mp.conns=[]; mp.active=false; mp.connecting=false; mp.isHost=false; mp.players={}; }
+addEventListener('pagehide',mpShutdown);
+document.addEventListener('visibilitychange',()=>{ if(document.hidden&&mp.active&&!(state==='play'||state==='dying')) mpShutdown(); });
 function mpHostAccept(c){
   c.on('open',()=>{ c._pid=mp.nextId++; mp.conns.push(c);
     mp.players[c._pid]={x:0,y:0,face:1,big:false,gflip:false,active:false,color:'#ff6b6b',hat:'none',emote:'',emoteT:0};
@@ -1079,7 +1090,7 @@ function mpHostAccept(c){
     mpStatus('👨‍👩‍👧‍👦 '+(mp.conns.length+1)+' players in the room.'); });
 }
 function mpGuestWire(c){
-  c.on('open',()=>{ mp.active=true; mp.connecting=false; mp.isHost=false; mp.players={};
+  c.on('open',()=>{ mp.active=true; mp.connecting=false; mp.claimTries=0; mp.isHost=false; mp.players={};
     mpStatus('🎉 Joined the family room! The leader picks the level and starts.'); updHostRow();
     c.send({t:'hello', color:sel.color, hat:sel.hat}); });
   c.on('data',d=>{ if(!d) return;
