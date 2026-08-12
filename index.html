@@ -180,7 +180,7 @@
 </div>
 
 <script>
-const APP_VERSION='v29';
+const APP_VERSION='v30';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -219,6 +219,7 @@ let frog=null;                                          // 🐸 rideable mount
 let skate=null;                                         // 🛹 rideable skateboard
 let rival=null;                                         // 🏁 AI racer to the flag
 let flips=[], flipCd=0;                                 // 🙃 gravity-flip pads
+let shells=[];                                          // 🤾 squashed-enemy shells you can pick up and hurl
 let chaosFx=null, chaosLabel='', chaosG=1;              // 🎲 chaos mutator for this run
 // ---------- adventure mode 🌈 ----------
 let advMode=false;
@@ -273,6 +274,8 @@ function initWX(name){ const type=WXMAP[name]; if(!type){ wx=null; return; }
 }
 let cannons=[];                                         // 🛢️ blast barrels
 function dropLoot(en){ if(hatIs('pirate')) coins.push({x:en.x+en.w/2, y:en.y-4, got:false}); }
+function spawnShell(en){ shells.push({x:en.x+en.w/2-15, y:en.y+en.h-12, w:30, h:12, t:6,
+  col:en.type==='chase'?'#d0603b':en.type==='jump'?'#3ba05c':en.type==='shoot'?'#6a7078':en.type==='fly'?'#e06fb0':'#8a5cd0'}); }
 let doorA=null, doorB=null, warpT=0, warpCd=0;          // 🚪 warp door + coin vault
 let levelT=0;                                           // ⏱ time attack clock
 let timeStore={};                                       // best times per level
@@ -778,7 +781,7 @@ function buildLevel(idx, defO){
   H=13+SKY; W=def.W; grid=Array.from({length:H},()=>new Array(W).fill(0));
   coins=[]; enemies=[]; spikes=[]; projectiles=[]; boxes=[]; presents=[]; toasts=[];
   springs=[]; movers=[]; gems=[]; checkpoint=null; wonder=null; wonderT=0; wonderFx=null; gMul=1;
-  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null; cannons=[]; skate=null; flips=[]; flipCd=0; pet=null;
+  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null; cannons=[]; skate=null; flips=[]; flipCd=0; pet=null; shells=[];
   const GT=10;                     // ground-top row (build-space)
   const api={
     ground(pits){ const isPit=x=>pits&&pits.some(([a,b])=>x>=a&&x<=b);
@@ -933,7 +936,7 @@ function buildCustomLevel(){
   W=ED_W; H=13+SKY; grid=Array.from({length:H},()=>new Array(W).fill(0));
   coins=[]; enemies=[]; spikes=[]; projectiles=[]; boxes=[]; presents=[]; toasts=[];
   springs=[]; movers=[]; gems=[]; checkpoint=null; wonder=null; wonderT=0; wonderFx=null; gMul=1;
-  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null; cannons=[]; skate=null; flips=[]; flipCd=0; pet=null; ghostPlay=null; rival=null; wx=null;
+  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null; cannons=[]; skate=null; flips=[]; flipCd=0; pet=null; shells=[]; ghostPlay=null; rival=null; wx=null;
   chaosFx=null; chaosG=1;
   for(let y=0;y<ED_H;y++) for(let x=0;x<W;x++){ const ch=editRows[y][x];
     if(ch==='#') grid[y][x]=1;
@@ -1006,7 +1009,7 @@ function buildRushArena(i){
   W=44; H=13+SKY; grid=Array.from({length:H},()=>new Array(W).fill(0));
   coins=[]; enemies=[]; spikes=[]; projectiles=[]; boxes=[]; presents=[]; toasts=[];
   springs=[]; movers=[]; gems=[]; checkpoint=null; wonder=null; wonderT=0; wonderFx=null; gMul=1;
-  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null; cannons=[]; skate=null; flips=[]; flipCd=0; pet=null; remixOn=false; ghostPlay=null; dailyMode=false;
+  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null; cannons=[]; skate=null; flips=[]; flipCd=0; pet=null; shells=[]; remixOn=false; ghostPlay=null; dailyMode=false;
   chaosFx=null; chaosG=1;
   initWX(def.name);
   for(let x=0;x<W;x++) for(let y=GT;y<13;y++) grid[y+SKY][x]=1;         // solid floor, no pits
@@ -1027,7 +1030,7 @@ function buildSurvArena(){
   W=44; H=13+SKY; grid=Array.from({length:H},()=>new Array(W).fill(0));
   coins=[]; enemies=[]; spikes=[]; projectiles=[]; boxes=[]; presents=[]; toasts=[];
   springs=[]; movers=[]; gems=[]; checkpoint=null; wonder=null; wonderT=0; wonderFx=null; gMul=1;
-  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null; cannons=[]; skate=null; flips=[]; flipCd=0; pet=null; ghostPlay=null; rival=null;
+  doorA=null; doorB=null; warpT=0; warpCd=0; levelT=0; frog=null; cannons=[]; skate=null; flips=[]; flipCd=0; pet=null; shells=[]; ghostPlay=null; rival=null;
   chaosFx=null; chaosG=1;
   for(let x=0;x<W;x++) for(let y=GT;y<13;y++) grid[y+SKY][x]=1;
   [[8,6,3],[20,4,3],[32,6,3]].forEach(([x,y,w])=>{ for(let k=0;k<w;k++) grid[y+SKY][x+k]=2; });
@@ -1166,7 +1169,9 @@ function update(dt){
   }
   // act button: star shot (if you have ammo), else dash / ground-pound
   if(keys.actEdge){ keys.actEdge=false;
-    if(pl.stars>0){ pl.stars--; sfx('star'); pl.shootFlash=0.09;
+    if(pl.carry){ pl.carry=null; sfx('shoot'); pl.shootFlash=0.09;   // 🤾 HURL the shell
+      projectiles.push({x:pl.x+pl.w/2, y:pl.y+6, vx:pl.face*470, vy:-100, life:2.5, friendly:true, shell:true, col:pl.carryCol}); }
+    else if(pl.stars>0){ pl.stars--; sfx('star'); pl.shootFlash=0.09;
       projectiles.push({x:pl.face>0?pl.x+pl.w+10:pl.x-10, y:pl.y+pl.h*0.5+3, vx:pl.face*430, vy:0, life:1.6, friendly:true}); }
     else if(pl.bubbles>0){ pl.bubbles--; sfx('bubble'); pl.shootFlash=0.09;
       projectiles.push({x:pl.face>0?pl.x+pl.w+10:pl.x-10, y:pl.y+pl.h*0.4, vx:pl.face*250, vy:-20, life:2.6, friendly:true, bubble:true}); }
@@ -1193,6 +1198,16 @@ function update(dt){
       pl.vy=(nearSurf?-540:-240)*gs2; pl.jumpBuf=0; sfx('bubble'); }
     else if(pl.onGround||pl.coyote>0){ pl.vy=-(JUMP*(has('highjump')?1.3:1)*jm)*gs2; pl.jumps=1; pl.jumpBuf=0; pl.coyote=0; pl.onGround=false; if(riding) skate.spinT=0.45; frogBound(); }
     else if(has('double') && pl.jumps===1){ pl.vy=-(JUMP*(has('highjump')?1.28:1.1)*jm)*gs2; pl.jumps=2; pl.jumpBuf=0; if(riding) skate.spinT=0.45; frogBound(); }
+    else if(!pl.onGround && pl.jumps>=2 && !pl.grap && !inW && !pl.gflip){ pl.jumpBuf=0;   // 🪝 third press throws the hook
+      let best=null, bd2=1e9;
+      const hx3=Math.floor((pl.x+pl.w/2)/TILE), hy3=Math.floor(pl.y/TILE);
+      for(let dy4=2; dy4<=7; dy4++) for(let dx4=-2; dx4<=5; dx4++){
+        const tx4=hx3+dx4*pl.face, ty4=hy3-dy4;
+        if(!solidAt(tx4,ty4)) continue;
+        const score=dy4+Math.abs(dx4)*1.2; if(score<bd2){ bd2=score; best=[tx4,ty4]; } }
+      if(best){ const ax=(best[0]+0.5)*TILE, ay=(best[1]+1)*TILE;
+        const d4=Math.hypot(pl.x+pl.w/2-ax, pl.y+pl.h/2-ay);
+        pl.grap={ax, ay, len:Math.max(70,Math.min(230,d4))}; pl.jumps=3; sfx('star'); } }
   }
   // variable jump height (release early = shorter)
   const hg=hatIs('astro')?0.92:1;   // moon boots
@@ -1214,6 +1229,18 @@ function update(dt){
   if(landed){ if(pl.onGround===false && wasAir) {} pl.onGround=true; pl.jumps=0; if(pl.pounding){ pl.pounding=false; poundShake=0.25; }
     if(chaosFx==='bouncy' && !inW) pl.vy=-470*gs2; }   // 🦘 the floor is a trampoline
   else pl.onGround=false;
+  // 🪝 swinging: hold jump to hang on, release to FLING
+  if(pl.grap){
+    if(pl.onGround||inW){ pl.grap=null; }
+    else if(!keys.jump){ pl.grap=null; pl.vx*=1.18; pl.vy=Math.min(pl.vy,-180); pl.blastT=1.0; sfx('spring'); }
+    else{ pl.vx+=dir*420*dt;
+      const cx3=pl.x+pl.w/2, cy3=pl.y+pl.h/2;
+      const ddx=cx3-pl.grap.ax, ddy=cy3-pl.grap.ay, dd=Math.hypot(ddx,ddy)||1;
+      if(dd>pl.grap.len){ const nx=ddx/dd, ny=ddy/dd;
+        const dot=pl.vx*nx+pl.vy*ny; if(dot>0){ pl.vx-=dot*nx; pl.vy-=dot*ny; }
+        pl.x=pl.grap.ax+nx*pl.grap.len-pl.w/2; pl.y=pl.grap.ay+ny*pl.grap.len-pl.h/2; }
+    }
+  }
   if(pl.gflip && pl.y<-80){ pl.gflip=false; }          // flew off the top — gravity comes back
   if(pl.onGround) pl.coyote=0.09;
   // fell in a pit
@@ -1234,7 +1261,7 @@ function update(dt){
       continue; }
     if(en.stun>0){ en.stun-=dt;        // frozen by a wonder flower: harmless, stompable statue
       if(pl.hurt<=0 && rectHit(pl,en) && ((pl.vy>0&&(pl.y+pl.h)-en.y<20)||pl.pounding||pl.big)){
-        en.alive=false; if(!pl.pounding&&!pl.big) pl.vy=-460; addPop(en.x+en.w/2,en.y); sfx('stomp'); dropLoot(en); }
+        en.alive=false; if(!pl.pounding&&!pl.big) pl.vy=-460; addPop(en.x+en.w/2,en.y); sfx('stomp'); dropLoot(en); spawnShell(en); }
       continue; }
     if(et==='fly'){
       // hovers: no gravity, drifts + bobs, reverses at walls
@@ -1274,11 +1301,11 @@ function update(dt){
     if(en.y>H*TILE+80){ en.alive=false; continue; }
     // vs player — stomp/pound from above kills; flyers count too
     if(pl.hurt<=0 && !pl.inCannon && rectHit(pl,en)){
-      if(pl.big){ en.alive=false; addPop(en.x+en.w/2,en.y); sfx('stomp'); dropLoot(en); }   // giant hero squashes on touch
+      if(pl.big){ en.alive=false; addPop(en.x+en.w/2,en.y); sfx('stomp'); dropLoot(en); spawnShell(en); }   // giant hero squashes on touch
       else if((pl.vy>0 && (pl.y+pl.h)-en.y < 20) || pl.pounding){
-        en.alive=false; if(!pl.pounding) pl.vy=-460; addPop(en.x+en.w/2,en.y); sfx('stomp'); dropLoot(en);
+        en.alive=false; if(!pl.pounding) pl.vy=-460; addPop(en.x+en.w/2,en.y); sfx('stomp'); dropLoot(en); spawnShell(en);
       } else if(skate&&skate.state==='ride' && (pl.onGround||pl.coyote>0) && Math.abs(pl.vx)>240){   // speed ram!
-        en.alive=false; addPop(en.x+en.w/2,en.y); sfx('stomp'); dropLoot(en); pl.vx*=0.72;
+        en.alive=false; addPop(en.x+en.w/2,en.y); sfx('stomp'); dropLoot(en); spawnShell(en); pl.vx*=0.72;
       } else hitPlayer();
     }
   }
@@ -1288,6 +1315,7 @@ function update(dt){
     if(pr.life<=0 || solidAt(Math.floor(pr.x/TILE),Math.floor(pr.y/TILE))){ pr.dead=true; continue; }
     if(pr.friendly){
       if(pr.bubble) pr.vy-=30*dt;   // bubbles drift upward
+      if(pr.shell) pr.vy+=900*dt;   // hurled shells arc down
       if(boss&&boss.alive&&boss.active&&boss.inv<=0 && pr.x>boss.x-6 && pr.x<boss.x+boss.w+6 && pr.y>boss.y-6 && pr.y<boss.y+boss.h+6){
         pr.dead=true; if(pr.bubble){ addPop(pr.x,pr.y); sfx('pop'); } else bossHit(); continue; }
       for(const en of enemies){ if(en.alive && !en.bubbled && pr.x>en.x-6 && pr.x<en.x+en.w+6 && pr.y>en.y-6 && pr.y<en.y+en.h+6){
@@ -1375,6 +1403,10 @@ function update(dt){
   }
   // spikes
   for(const s of spikes){ if(pl.hurt<=0 && pl.x+pl.w-6>s.x && pl.x+6<s.x+TILE && pl.y+pl.h>s.y-13 && pl.y<s.y){ hitPlayer(); } }
+  // 🤾 shells: pick one up by touching it (auto-carried overhead)
+  for(let i=shells.length-1;i>=0;i--){ const sh=shells[i]; sh.t-=dt;
+    if(sh.t<=0){ shells.splice(i,1); continue; }
+    if(!pl.carry && pl.hurt<=0 && rectHit(pl,sh)){ pl.carry=true; pl.carryCol=sh.col; shells.splice(i,1); sfx('box'); } }
   // springs — land on one to launch skyward
   for(const s of springs){ if(s.t>0) s.t-=dt;
     if(pl.vy>0 && pl.x+pl.w>s.x+2 && pl.x<s.x+s.w-2 && pl.y+pl.h>s.y-2 && pl.y+pl.h<s.y+s.h+14){
@@ -1783,6 +1815,11 @@ function render(){
       ctx.fillStyle='rgba(255,255,255,.75)'; ctx.beginPath(); ctx.arc(bx2-br*0.35,by2-br*0.4,br*0.16,0,7); ctx.fill(); } }
   // projectiles
   for(const pr of projectiles){ if(pr.dead) continue;
+    if(pr.friendly&&pr.shell){ // hurled shell, spinning
+      ctx.save(); ctx.translate(pr.x,pr.y); ctx.rotate(performance.now()/70);
+      ctx.fillStyle=pr.col||'#8a5cd0'; roundRect(-14,-6,28,12,5); ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,.8)'; ctx.beginPath(); ctx.arc(-5,-1,2.4,0,7); ctx.arc(6,-1,2.4,0,7); ctx.fill();
+      ctx.restore(); continue; }
     if(pr.friendly&&pr.bubble){ // floaty bubble shot
       ctx.fillStyle='rgba(150,220,255,.25)'; ctx.strokeStyle='rgba(190,235,255,.9)'; ctx.lineWidth=2;
       ctx.beginPath(); ctx.arc(pr.x,pr.y,9,0,7); ctx.fill(); ctx.stroke();
@@ -1808,6 +1845,14 @@ function render(){
     ctx.beginPath(); ctx.moveTo(gx,gy+30); ctx.lineTo(gx+6,gy+25); ctx.lineTo(gx+12,gy+30); ctx.lineTo(gx+18,gy+25); ctx.lineTo(gx+24,gy+30); ctx.stroke();
     ctx.globalAlpha=1;
   }
+  // 🤾 shells on the ground (blink when about to vanish)
+  for(const sh of shells){ if(sh.t<1.5 && Math.floor(performance.now()/120)%2===0) continue;
+    ctx.fillStyle=sh.col; roundRect(sh.x,sh.y,sh.w,sh.h,5); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(sh.x+9,sh.y+5,2.6,0,7); ctx.arc(sh.x+21,sh.y+5,2.6,0,7); ctx.fill(); }
+  // 🪝 grapple rope
+  if(p&&p.grap){ ctx.strokeStyle='rgba(240,230,200,.9)'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.moveTo(p.x+p.w/2,p.y+p.h/2); ctx.lineTo(p.grap.ax,p.grap.ay); ctx.stroke();
+    ctx.fillStyle='#c0c8d4'; ctx.beginPath(); ctx.arc(p.grap.ax,p.grap.ay,4.5,0,7); ctx.fill(); }
   // rival racer 🏁
   if(rival){ const R=rival, rcx=R.x+R.w/2, rcy=R.y+R.h/2;
     ctx.fillStyle='rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(rcx,R.y+R.h,R.w*0.5,4,0,0,7); ctx.fill();
@@ -1988,6 +2033,9 @@ function drawHero(){
         ctx.fillStyle='rgba(255,255,255,.95)'; ctx.beginPath(); ctx.arc(mx,gy,3*gs,0,7); ctx.fill(); }
     }
     drawHat(cx,cy-h/2);
+    if(b.carry){ const sy4=cy-h/2-14+Math.sin(performance.now()/200)*2;   // shell held overhead
+      ctx.fillStyle=b.carryCol||'#8a5cd0'; roundRect(cx-14,sy4-6,28,12,5); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(cx-5,sy4-1,2.4,0,7); ctx.arc(cx+6,sy4-1,2.4,0,7); ctx.fill(); }
   }
   if(b.shieldT>0 && (b.shieldT>2 || Math.floor(performance.now()/120)%2===0)){
     ctx.fillStyle='rgba(120,220,255,.14)'; ctx.strokeStyle='rgba(120,220,255,.8)'; ctx.lineWidth=3;
