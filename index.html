@@ -206,7 +206,7 @@
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
-const APP_VERSION='v33';
+const APP_VERSION='v34';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -1039,7 +1039,7 @@ const MP_RTC={ config:{ iceServers:[
 function mpStatus(t){ const el=document.getElementById('mpStatus'); if(el) el.textContent=t; }
 function updHostRow(){ document.getElementById('mpHostRow').style.display=(mp.active&&mp.isHost)?'':'none'; }
 // ---- relay transport (works on ANY network) — used when a family server is available ----
-const MP_RELAY='';   // set to the Railway URL, e.g. 'wss://hop-quest-production.up.railway.app'
+const MP_RELAY='wss://hop-quest-production.up.railway.app';   // the family server on Railway
 function relayURL(){
   if(/(^|\.)railway\.app$/.test(location.hostname)||location.hostname==='localhost'||location.hostname==='127.0.0.1')
     return (location.protocol==='https:'?'wss://':'ws://')+location.host;
