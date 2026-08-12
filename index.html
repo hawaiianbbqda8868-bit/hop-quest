@@ -206,7 +206,7 @@
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
-const APP_VERSION='v32';
+const APP_VERSION='v33';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -1038,7 +1038,37 @@ const MP_RTC={ config:{ iceServers:[
 ]}};   // (the old free TURN relays are dead — same-network play uses direct links)
 function mpStatus(t){ const el=document.getElementById('mpStatus'); if(el) el.textContent=t; }
 function updHostRow(){ document.getElementById('mpHostRow').style.display=(mp.active&&mp.isHost)?'':'none'; }
+// ---- relay transport (works on ANY network) — used when a family server is available ----
+const MP_RELAY='';   // set to the Railway URL, e.g. 'wss://hop-quest-production.up.railway.app'
+function relayURL(){
+  if(/(^|\.)railway\.app$/.test(location.hostname)||location.hostname==='localhost'||location.hostname==='127.0.0.1')
+    return (location.protocol==='https:'?'wss://':'ws://')+location.host;
+  return MP_RELAY;
+}
 function mpAutoJoin(){
+  if(mp.active||mp.connecting) return;
+  if(relayURL()) mpRelayJoin(); else mpAutoJoinP2P();
+}
+function mpRelayJoin(){
+  mp.connecting=true; mpStatus('Connecting to the family server…');
+  let ws; try{ ws=new WebSocket(relayURL()+'/ws'); }catch(e){ mp.connecting=false; mpStatus('Family server unreachable — trying direct…'); mpAutoJoinP2P(); return; }
+  mp.ws=ws;
+  const failover=setTimeout(()=>{ if(!mp.active&&mp.ws===ws){ try{ws.close();}catch(_){} mp.ws=null; mp.connecting=false;
+    mpStatus('Family server not answering — trying direct connect…'); mpAutoJoinP2P(); } },7000);
+  ws.onmessage=ev=>{ let d; try{ d=JSON.parse(ev.data); }catch(e){ return; }
+    if(d.t==='welcome'){ clearTimeout(failover); mp.active=true; mp.connecting=false; mp.myId=d.id; mp.leader=d.leader; mp.isHost=(d.leader===d.id); mp.players={};
+      mpStatus(mp.isHost?'🏠 You are the leader! Others just tap 🌐 FAMILY, then you press START.':'🎉 Joined the family room! ('+d.players.length+' here) Waiting for the leader…');
+      updHostRow(); mpSend({t:'hello', color:sel.color, hat:sel.hat}); }
+    else if(d.t==='room'){ if(!mp.active) return; mp.leader=d.leader; const wasHost=mp.isHost; mp.isHost=(d.leader===mp.myId);
+      for(const pid in mp.players){ if(!d.players.includes(+pid)) delete mp.players[pid]; }
+      mpStatus((mp.isHost?(wasHost?'🏠 You are the leader! ':'🏠 You are the leader now! '):'🎉 In the room! ')+'👨‍👩‍👧‍👦 '+d.players.length+' player'+(d.players.length===1?'':'s')+' here.');
+      updHostRow(); mpSend({t:'hello', color:sel.color, hat:sel.hat}); }
+    else if(d.t==='start'){ if(d.id===mp.leader && !mp.isHost){ mp.mode=d.mode; mpBegin(d.level); } }
+    else mpApply(d); };
+  ws.onclose=()=>{ if(mp.ws===ws){ mp.ws=null; if(mp.active){ mp.active=false; mp.players={}; mpStatus('Disconnected — tap RETRY.'); updHostRow(); } } };
+  ws.onerror=()=>{};
+}
+function mpAutoJoinP2P(){
   if(typeof Peer==='undefined'){ mpStatus('No internet — the family room needs to be online 😢'); return; }
   if(mp.active||mp.connecting) return;
   mp.connecting=true; mpStatus('Connecting to the family room…');
@@ -1072,7 +1102,8 @@ function mpGuestConnect(g,id,tries){
 }
 // leaving the page (or backgrounding on a phone) frees the room so no zombie leaders linger
 function mpShutdown(){ try{ if(mp.peer) mp.peer.destroy(); }catch(_){}
-  mp.peer=null; mp.hostConn=null; mp.conns=[]; mp.active=false; mp.connecting=false; mp.isHost=false; mp.players={}; }
+  try{ if(mp.ws) mp.ws.close(); }catch(_){}
+  mp.peer=null; mp.ws=null; mp.hostConn=null; mp.conns=[]; mp.active=false; mp.connecting=false; mp.isHost=false; mp.players={}; }
 addEventListener('pagehide',mpShutdown);
 document.addEventListener('visibilitychange',()=>{ if(document.hidden&&mp.active&&!(state==='play'||state==='dying')) mpShutdown(); });
 function mpHostAccept(c){
@@ -1103,6 +1134,7 @@ function mpGuestWire(c){
 }
 function mpBroadcast(d,except){ for(const c of mp.conns){ if(c!==except&&c.open){ try{ c.send(d); }catch(e){} } } }
 function mpSend(d){ if(!mp.active) return;
+  if(mp.ws){ if(mp.ws.readyState===1){ try{ mp.ws.send(JSON.stringify(d)); }catch(e){} } return; }
   if(mp.isHost){ d.id=0; mpBroadcast(d,null); }
   else if(mp.hostConn&&mp.hostConn.open){ try{ mp.hostConn.send(d); }catch(e){} } }
 function mpApply(d){ const id=d.id; if(id==null||id===mp.myId) return;
@@ -1119,7 +1151,9 @@ function mpBegin(lvl){ mp.finished=false; mp.anyFinish=false;
   sel.remix=rmx; sel.chaos=chs; sel.rival=rvl;
 }
 function mpStart(){ if(!mp.isHost||!mp.active) return;
-  mpBroadcast({t:'start', mode:mp.mode, level:menuLevel}, null); mpBegin(menuLevel); }
+  if(mp.ws) mpSend({t:'start', mode:mp.mode, level:menuLevel});
+  else mpBroadcast({t:'start', mode:mp.mode, level:menuLevel}, null);
+  mpBegin(menuLevel); }
 // ---------- boss rush ----------
 function rushBest(){ return +(localStorage.getItem('hopRushBest')||0); }
 function saveRushBest(n){ try{ if(n>rushBest()) localStorage.setItem('hopRushBest',n); }catch(e){} }
@@ -1990,7 +2024,7 @@ function render(){
       ctx.fillStyle='#222'; ctx.beginPath(); ctx.arc(fcx-4+F.face*1.6,F.y+fh2/2-4,2,0,7); ctx.arc(fcx+6+F.face*1.6,F.y+fh2/2-4,2,0,7); ctx.fill();
       ctx.restore();
       ctx.fillStyle='rgba(255,255,255,.92)'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center';
-      ctx.fillText(pid==='0'?'⭐LEADER':'P'+(+pid+1),fcx,F.y-8);
+      ctx.fillText((+pid===mp.leader||pid==='0')?'⭐LEADER':'P'+pid,fcx,F.y-8);
       if(F.emoteT>0){ ctx.font='22px sans-serif'; ctx.fillText(F.emote,fcx,F.y-26); }
     }
   }
