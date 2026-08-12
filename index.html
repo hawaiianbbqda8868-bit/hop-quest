@@ -63,6 +63,9 @@
     background:rgba(10,16,40,.88); border-radius:14px; padding:8px 10px; width:min(96vw,860px); }
   #editBar.hidden { display:none; }
   #editBar .chip { font-size:12px; padding:6px 9px; }
+  #emoteBar { position:fixed; left:12px; top:50%; transform:translateY(-50%); z-index:25; display:flex; flex-direction:column; gap:8px; }
+  #emoteBar.hidden { display:none; }
+  #emoteBar .chip { font-size:20px; padding:8px 10px; background:rgba(255,255,255,.12); }
   .big { font-size:clamp(40px,13vw,84px); font-weight:900; }
   .win { color:#7ee08a; } .lose { color:#ff7a7a; }
   #hud { position:fixed; top:12px; left:14px; z-index:30; color:#fff; font-size:20px; font-weight:800;
@@ -118,6 +121,7 @@
     <button class="chip modebtn" id="rushBtn" style="background:linear-gradient(180deg,#e0a8ff,#9a4ae0);color:#2a0a3a;border:none">👑 BOSS RUSH</button>
     <button class="chip modebtn" id="dailyBtn" style="background:linear-gradient(180deg,#8ae0ff,#3a8ae0);color:#082a4a;border:none">🎲 DAILY</button>
     <button class="chip modebtn" id="survBtn" style="background:linear-gradient(180deg,#ffb08a,#e05a3a);color:#3a1208;border:none">👾 SURVIVAL</button>
+    <button class="chip modebtn" id="mpBtn" style="background:linear-gradient(180deg,#8affd0,#2ab88a);color:#04301e;border:none">🌐 FAMILY</button>
   </div>
 
   <div class="row tabs">
@@ -153,6 +157,27 @@
   <div class="sub" style="margin-top:8px">Move: ◀ ▶ / arrows · Jump: ▲ / Space · Power: ✦ / Shift</div>
 </div>
 
+<div class="overlay hidden" id="mpScreen">
+  <div class="title" style="font-size:clamp(26px,7vw,44px)">🌐 FAMILY ROOM</div>
+  <div class="sub">Everyone taps 🌐 FAMILY on their own phone — you all meet in one room. Easy!</div>
+  <div class="card">
+    <div class="sub" id="mpStatus" style="font-size:16px">Connecting…</div>
+    <div class="row" style="margin-top:6px"><button class="chip" id="mpRetry">🔄 RETRY</button></div>
+    <div class="row" id="mpHostRow" style="display:none;margin-top:10px">
+      <button class="chip sel" id="mpRace">🏁 Race</button>
+      <button class="chip" id="mpBuddy">🤝 Together</button>
+      <button class="chip" id="mpStartBtn" style="background:linear-gradient(180deg,#a8ff9c,#3fbf5a);color:#06243a;border:none;font-weight:800">START ▶</button>
+    </div>
+    <div class="sub" style="font-size:11px;margin-top:8px">The leader picks the level in the menu first. Race = first to the flag wins!</div>
+  </div>
+  <button class="chip" id="mpBack" style="margin-top:10px">← Menu</button>
+</div>
+
+<div id="emoteBar" class="hidden">
+  <button class="chip" data-e="😂">😂</button><button class="chip" data-e="❤️">❤️</button>
+  <button class="chip" data-e="🚀">🚀</button><button class="chip" data-e="🐢">🐢</button>
+</div>
+
 <div class="overlay hidden" id="mapScreen">
   <div class="title" style="font-size:clamp(28px,7vw,48px)">🌈 ADVENTURE</div>
   <div class="sub" id="mapStory">The Rainbow King stole every world's color! Clear levels to win it back, earn ⭐ to open the gates.</div>
@@ -179,8 +204,9 @@
   <button class="chip" id="overMenu" style="margin-top:12px">← Menu / change hero</button>
 </div>
 
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
-const APP_VERSION='v30';
+const APP_VERSION='v31';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -1000,6 +1026,89 @@ function edPaintAt(e){ const r=cv.getBoundingClientRect();
   if(tx<0||tx>=ED_W||ty<0||ty>=ED_H) return;
   if(editRows[ty][tx]===brush) return;
   editRows[ty][tx]=brush; saveCustom(); const cx0=cam.x, cy0=cam.y; buildCustomLevel(); p=null; pet=null; cam={x:cx0,y:cy0}; }
+// ---------- family room multiplayer 🌐 ----------
+// One tap: everyone on this site's copy of the game meets in the same auto-room.
+// First one in becomes the leader (hosts + relays); the rest connect to them.
+const mp={peer:null, conns:[], hostConn:null, isHost:false, active:false, connecting:false,
+  myId:0, nextId:1, mode:'race', finished:false, anyFinish:false, lastSend:0, players:{}};
+function famId(){ let h=0; const s2=(location.host||'hopquest')+'/hq'; for(const ch of s2) h=(h*31+ch.charCodeAt(0))>>>0; return 'hopquest-fam-'+h.toString(36); }
+const MP_RTC={ config:{ iceServers:[
+  {urls:'stun:stun.l.google.com:19302'},
+  {urls:'turn:openrelay.metered.ca:80', username:'openrelayproject', credential:'openrelayproject'},
+  {urls:'turn:openrelay.metered.ca:443', username:'openrelayproject', credential:'openrelayproject'}
+]}};
+function mpStatus(t){ const el=document.getElementById('mpStatus'); if(el) el.textContent=t; }
+function updHostRow(){ document.getElementById('mpHostRow').style.display=(mp.active&&mp.isHost)?'':'none'; }
+function mpAutoJoin(){
+  if(typeof Peer==='undefined'){ mpStatus('No internet — the family room needs to be online 😢'); return; }
+  if(mp.active||mp.connecting) return;
+  mp.connecting=true; mpStatus('Connecting to the family room…');
+  const id=famId();
+  const pr=new Peer(id, MP_RTC);
+  pr.on('open',()=>{ mp.peer=pr; mp.isHost=true; mp.active=true; mp.connecting=false; mp.myId=0; mp.nextId=1; mp.players={};
+    mpStatus('🏠 You opened the family room! You are the leader — others just tap 🌐 FAMILY.'); updHostRow(); });
+  pr.on('connection',c=>{ if(!mp.isHost) return; mpHostAccept(c); });
+  pr.on('error',e=>{
+    if(e.type==='unavailable-id'){ try{pr.destroy();}catch(_){}
+      const g=new Peer(MP_RTC);
+      g.on('open',()=>{ mp.peer=g; mpGuestConnect(g,id,0); });
+      g.on('error',e2=>{ mp.connecting=false; mpStatus('Could not connect ('+e2.type+') — tap RETRY.'); });
+    } else { mp.connecting=false; mpStatus('Connection problem ('+e.type+') — tap RETRY.'); }
+  });
+}
+function mpGuestConnect(g,id,tries){
+  const c=g.connect(id); mp.hostConn=c; mpGuestWire(c);
+  setTimeout(()=>{ if(mp.hostConn===c && !c.open && !mp.active){
+    try{ c.close(); }catch(_){}
+    if(tries<3){ mpStatus('Still connecting… (try '+(tries+2)+')'); mpGuestConnect(g,id,tries+1); }
+    else { mp.connecting=false; mpStatus('Could not reach the leader — tap RETRY.'); }
+  } }, 4500);
+}
+function mpHostAccept(c){
+  c.on('open',()=>{ c._pid=mp.nextId++; mp.conns.push(c);
+    mp.players[c._pid]={x:0,y:0,face:1,big:false,gflip:false,active:false,color:'#ff6b6b',hat:'none',emote:'',emoteT:0};
+    c.send({t:'welcome', id:c._pid, mode:mp.mode});
+    c.send({t:'hello', id:0, color:sel.color, hat:sel.hat});
+    mpStatus('👨‍👩‍👧‍👦 '+(mp.conns.length+1)+' players in the room! Pick a mode and START.'); updHostRow();
+    if((state==='play'||state==='dying')&&mp.mode==='buddy') c.send({t:'start', mode:'buddy', level:curLevel});
+  });
+  c.on('data',d=>{ if(!d) return;
+    if(d.t==='pos'||d.t==='emote'||d.t==='hello'||d.t==='finish'){ d.id=c._pid; mpApply(d); mpBroadcast(d,c); } });
+  c.on('close',()=>{ mp.conns=mp.conns.filter(x=>x!==c); delete mp.players[c._pid];
+    mpBroadcast({t:'left', id:c._pid},null);
+    mpStatus('👨‍👩‍👧‍👦 '+(mp.conns.length+1)+' players in the room.'); });
+}
+function mpGuestWire(c){
+  c.on('open',()=>{ mp.active=true; mp.connecting=false; mp.isHost=false; mp.players={};
+    mpStatus('🎉 Joined the family room! The leader picks the level and starts.'); updHostRow();
+    c.send({t:'hello', color:sel.color, hat:sel.hat}); });
+  c.on('data',d=>{ if(!d) return;
+    if(d.t==='welcome'){ mp.myId=d.id; mp.mode=d.mode||'race'; }
+    else if(d.t==='start'){ mp.mode=d.mode; mpBegin(d.level); }
+    else if(d.t==='left'){ delete mp.players[d.id]; }
+    else mpApply(d); });
+  c.on('close',()=>{ mp.active=false; mp.connecting=false; mp.players={}; mp.hostConn=null;
+    mpStatus('The leader left — tap RETRY and someone becomes the new leader!'); updHostRow(); });
+}
+function mpBroadcast(d,except){ for(const c of mp.conns){ if(c!==except&&c.open){ try{ c.send(d); }catch(e){} } } }
+function mpSend(d){ if(!mp.active) return;
+  if(mp.isHost){ d.id=0; mpBroadcast(d,null); }
+  else if(mp.hostConn&&mp.hostConn.open){ try{ mp.hostConn.send(d); }catch(e){} } }
+function mpApply(d){ const id=d.id; if(id==null||id===mp.myId) return;
+  const P=mp.players[id]||(mp.players[id]={x:0,y:0,face:1,big:false,gflip:false,active:false,color:'#ff6b6b',hat:'none',emote:'',emoteT:0});
+  if(d.t==='pos'){ P.x=d.x; P.y=d.y; P.face=d.f; P.big=d.b; P.gflip=d.g; P.active=true; }
+  else if(d.t==='hello'){ P.color=d.color||P.color; P.hat=d.hat||P.hat; }
+  else if(d.t==='emote'){ P.emote=d.e; P.emoteT=2; }
+  else if(d.t==='finish'){ if((state==='play'||state==='dying')&&!mp.finished&&!mp.anyFinish) toasts.push({x:p?p.x+12:0, y:p?p.y-40:0, ic:'🏁 Someone finished! Hurry!', t:2}); mp.anyFinish=true; }
+}
+function mpBegin(lvl){ mp.finished=false; mp.anyFinish=false;
+  const rmx=sel.remix, chs=sel.chaos, rvl=sel.rival;
+  sel.remix=false; sel.chaos=false; sel.rival=false;
+  startGame(lvl,false);
+  sel.remix=rmx; sel.chaos=chs; sel.rival=rvl;
+}
+function mpStart(){ if(!mp.isHost||!mp.active) return;
+  mpBroadcast({t:'start', mode:mp.mode, level:menuLevel}, null); mpBegin(menuLevel); }
 // ---------- boss rush ----------
 function rushBest(){ return +(localStorage.getItem('hopRushBest')||0); }
 function saveRushBest(n){ try{ if(n>rushBest()) localStorage.setItem('hopRushBest',n); }catch(e){} }
@@ -1447,6 +1556,10 @@ function update(dt){
     pl.gflip=!pl.gflip; pl.vy=0; flipCd=1.2; sfx('warp'); toasts.push({x:fp.x,y:fp.y-34,ic:'🙃',t:1}); break; } }
   // level clock (time attack; boss rush keeps its own pace)
   if(!rushMode) levelT+=dt;
+  // family room: stream my position ~20x/s
+  if(mp.active){ const now3=performance.now();
+    if(now3-mp.lastSend>50){ mp.lastSend=now3;
+      mpSend({t:'pos', x:Math.round(pl.x), y:Math.round(pl.y), f:pl.face, b:!!pl.big, g:!!pl.gflip}); } }
   // ghost recorder (10Hz, normal runs only)
   if(!rushMode && !remixOn){ recT+=dt;
     while(recT>=0.1){ recT-=0.1; if(ghostRec.length<12000){ ghostRec.push(Math.round(pl.x),Math.round(pl.y)); } } }
@@ -1853,6 +1966,23 @@ function render(){
   if(p&&p.grap){ ctx.strokeStyle='rgba(240,230,200,.9)'; ctx.lineWidth=2.5;
     ctx.beginPath(); ctx.moveTo(p.x+p.w/2,p.y+p.h/2); ctx.lineTo(p.grap.ax,p.grap.ay); ctx.stroke();
     ctx.fillStyle='#c0c8d4'; ctx.beginPath(); ctx.arc(p.grap.ax,p.grap.ay,4.5,0,7); ctx.fill(); }
+  // 🌐 family members, live
+  if(mp.active&&(state==='play'||state==='dying')){
+    for(const pid in mp.players){ const F=mp.players[pid]; if(!F.active) continue;
+      const fw2=F.big?46:24, fh2=F.big?58:30, fcx=F.x+fw2/2;
+      ctx.save(); ctx.globalAlpha=0.88;
+      if(F.gflip){ ctx.translate(0,2*(F.y+fh2/2)); ctx.scale(1,-1); }
+      const g3=ctx.createLinearGradient(fcx,F.y,fcx,F.y+fh2); g3.addColorStop(0,lighten(F.color)); g3.addColorStop(1,F.color);
+      ctx.fillStyle=g3; roundRect(F.x,F.y,fw2,fh2,8); ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,.5)'; ctx.lineWidth=2; ctx.stroke();
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.ellipse(fcx-4,F.y+fh2/2-4,3.6,4.4,0,0,7); ctx.ellipse(fcx+6,F.y+fh2/2-4,3.6,4.4,0,0,7); ctx.fill();
+      ctx.fillStyle='#222'; ctx.beginPath(); ctx.arc(fcx-4+F.face*1.6,F.y+fh2/2-4,2,0,7); ctx.arc(fcx+6+F.face*1.6,F.y+fh2/2-4,2,0,7); ctx.fill();
+      ctx.restore();
+      ctx.fillStyle='rgba(255,255,255,.92)'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center';
+      ctx.fillText(pid==='0'?'⭐LEADER':'P'+(+pid+1),fcx,F.y-8);
+      if(F.emoteT>0){ ctx.font='22px sans-serif'; ctx.fillText(F.emote,fcx,F.y-26); }
+    }
+  }
   // rival racer 🏁
   if(rival){ const R=rival, rcx=R.x+R.w/2, rcy=R.y+R.h/2;
     ctx.fillStyle='rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(rcx,R.y+R.h,R.w*0.5,4,0,0,7); ctx.fill();
@@ -2136,7 +2266,7 @@ function drawHUD(){
 }
 
 // ---------- overlays / UI ----------
-function hideOverlays(){ ['startScreen','overScreen','victoryScreen','mapScreen'].forEach(id=>document.getElementById(id).classList.add('hidden')); }
+function hideOverlays(){ ['startScreen','overScreen','victoryScreen','mapScreen','mpScreen'].forEach(id=>document.getElementById(id).classList.add('hidden')); }
 function openMap(){ state='start'; hideOverlays(); buildMap(); document.getElementById('mapScreen').classList.remove('hidden'); setTrack('title'); }
 function buildMap(){
   document.getElementById('mapStars').textContent='⭐ '+totalStars()+' / '+(LEVELS.length*3);
@@ -2183,6 +2313,9 @@ function win(){ sfx('win'); bank+=coinsGot; saveBank();
     ghostStoreObj[curLevel]=ghostRec.slice(0,12000); saveGhosts(); }   // your best run becomes the ghost to race
   let rivalNote='';
   if(rival){ if(!rival.done){ bank+=25; saveBank(); rivalNote=' You beat the rival! +25 🪙 bonus.'; } else rivalNote=' The rival got there first! 😜'; }
+  if(mp.active&&mp.mode==='race'&&!mp.finished){ mp.finished=true;
+    const wonRace=!mp.anyFinish; mp.anyFinish=true; mpSend({t:'finish', time:Math.round(levelT)});
+    rivalNote+=wonRace?' 🏆 YOU WON THE FAMILY RACE!':' 🏁 Finished — someone was faster! 😜'; }
   if(advMode){ const was=clearStore[curLevel]; clearStore[curLevel]=true; saveClears();
     rivalNote+=' 🌈 '+(was?'Color still shining!':'You brought this world\'s color back!')+' ⭐'+starsFor(curLevel)+'/3 · total '+totalStars()+'⭐'; }
   const best=timeStore[curLevel];
@@ -2281,6 +2414,15 @@ document.getElementById('dailyBtn').onclick=()=>{ saveHero(); startDaily(); };
 document.getElementById('advBtn').onclick=()=>openMap();
 document.getElementById('mapBack').onclick=()=>toMenu();
 document.getElementById('survBtn').onclick=()=>{ saveHero(); startSurvival(); };
+document.getElementById('mpBtn').onclick=()=>{ state='start'; hideOverlays(); document.getElementById('mpScreen').classList.remove('hidden'); mpAutoJoin(); updHostRow(); };
+document.getElementById('mpRetry').onclick=()=>mpAutoJoin();
+document.getElementById('mpBack').onclick=()=>toMenu();
+document.getElementById('mpStartBtn').onclick=()=>mpStart();
+const mpRaceEl=document.getElementById('mpRace'), mpBuddyEl=document.getElementById('mpBuddy');
+mpRaceEl.onclick=()=>{ mp.mode='race'; mpRaceEl.classList.add('sel'); mpBuddyEl.classList.remove('sel'); };
+mpBuddyEl.onclick=()=>{ mp.mode='buddy'; mpBuddyEl.classList.add('sel'); mpRaceEl.classList.remove('sel'); };
+document.querySelectorAll('#emoteBar .chip').forEach(b=>b.onclick=()=>{ const e=b.dataset.e;
+  mpSend({t:'emote', e}); if(p) toasts.push({x:p.x+p.w/2, y:p.y-28, ic:e, t:1.5}); });
 const remixTogEl=document.getElementById('remixTog');
 function updRemixUI(){ remixTogEl.textContent='🔀 Remix: '+(sel.remix?'ON':'OFF')+(sel.remix?' — mirrored & spicy!':''); remixTogEl.classList.toggle('sel',!!sel.remix); }
 remixTogEl.onclick=()=>{ sel.remix=!sel.remix; saveHero(); updRemixUI(); buildMenu(); };
@@ -2319,6 +2461,8 @@ function loop(ts){ let dt=Math.min(0.033,(ts-last)/1000)||0; last=ts;
   for(let i=pops.length-1;i>=0;i--){ pops[i].t-=dt; if(pops[i].t<=0) pops.splice(i,1); }
   if(toasts) for(let i=toasts.length-1;i>=0;i--){ toasts[i].t-=dt; toasts[i].y-=28*dt; if(toasts[i].t<=0) toasts.splice(i,1); }
   if(coins) for(let i=coins.length-1;i>=0;i--){ const c=coins[i]; if(c.fall&&c.y>H*TILE+40) coins.splice(i,1); }  // rain coins lost to pits
+  for(const pid in mp.players){ if(mp.players[pid].emoteT>0) mp.players[pid].emoteT-=dt; }
+  document.getElementById('emoteBar').classList.toggle('hidden', !(mp.active&&(state==='play'||state==='dying')));
   render(); drawHUD();
   requestAnimationFrame(loop);
 }
