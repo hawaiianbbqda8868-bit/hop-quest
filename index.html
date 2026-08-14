@@ -22,8 +22,16 @@
   #left  { left:24px;  width:74px; height:74px; background:rgba(255,255,255,.16); }
   #right { left:110px; width:74px; height:74px; background:rgba(255,255,255,.16); }
   #jump  { right:24px;  width:96px; height:96px; background:radial-gradient(circle at 40% 35%,#a8ff9c,#3fbf5a); }
-  #act   { right:132px; width:74px; height:74px; bottom:40px; background:radial-gradient(circle at 40% 35%,#ffd77a,#f0a93a); font-size:24px; }
-  #fire  { right:140px; width:66px; height:66px; bottom:126px; background:radial-gradient(circle at 40% 35%,#ffb0b0,#e04a4a); font-size:24px; }
+  #fire  { right:130px; width:76px; height:76px; bottom:32px; background:radial-gradient(circle at 40% 35%,#ffb0b0,#e04a4a); font-size:26px; }
+  #dash  { right:130px; width:68px; height:68px; bottom:118px; background:radial-gradient(circle at 40% 35%,#bfe4ff,#3a9ae0); font-size:24px; }
+  #pound { right:216px; width:68px; height:68px; bottom:44px; background:radial-gradient(circle at 40% 35%,#e0c0ff,#8a4ae0); font-size:24px; }
+  #act   { left:24px; width:64px; height:64px; bottom:118px; background:radial-gradient(circle at 40% 35%,#ffd77a,#f0a93a); font-size:22px; }
+  .btn.off { opacity:.35; }
+  @media (max-width:760px){
+    #jump{width:82px;height:82px} #fire{width:66px;height:66px;right:114px}
+    #dash{width:58px;height:58px;right:118px;bottom:100px} #pound{width:58px;height:58px;right:190px}
+    #act{width:56px;height:56px}
+  }
   .btn:active { filter:brightness(1.2); transform:scale(.95); }
 
   .overlay { position:fixed; inset:0; z-index:50; display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
@@ -111,6 +119,8 @@
 <button class="btn pad" id="jump">▲</button>
 <button class="btn pad" id="act">✦</button>
 <button class="btn pad" id="fire">🔫</button>
+<button class="btn pad" id="dash">💨</button>
+<button class="btn pad" id="pound">⬇️</button>
 
 <div class="overlay" id="startScreen">
   <div class="title">HOP QUEST</div>
@@ -157,7 +167,7 @@
     </div>
   </div>
 
-  <div class="sub" style="margin-top:8px">Move: ◀ ▶ · Jump: ▲ / Space · Power: ✦ / Shift · <b>Shoot: 🔫 / F</b> — your coins are the bullets!</div>
+  <div class="sub" style="margin-top:8px">Move: ◀ ▶ · Jump: ▲ / Space · <b>🔫 Shoot</b> (F) · <b>💨 Dash</b> (X) · <b>⬇️ Pound</b> (↓) · ✦ throw (Shift) — coins are your bullets!</div>
 </div>
 
 <div class="overlay hidden" id="lvlScreen" style="justify-content:center">
@@ -215,7 +225,7 @@
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
-const APP_VERSION='v37';
+const APP_VERSION='v38';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -1382,16 +1392,16 @@ function startGame(idx, adv){ rushMode=false; dailyMode=false; customMode=false;
   state='play'; winFlash=0; deathTimer=0; hideOverlays(); setTrack(LEVELS[menuLevel].music||'cheery'); }
 
 // ---------- input ----------
-const keys={left:false,right:false,jump:false,jumpEdge:false,act:false,actEdge:false,fire:false,fireEdge:false};
-const KM={ArrowLeft:'left',a:'left',A:'left',ArrowRight:'right',d:'right',D:'right',ArrowUp:'jump',w:'jump',W:'jump',' ':'jump',Shift:'act',f:'fire',F:'fire',z:'fire',Z:'fire',Control:'fire'};
-addEventListener('keydown',e=>{ const k=KM[e.key]; if(k){ if(k==='jump'&&!keys.jump) keys.jumpEdge=true; if(k==='act'&&!keys.act) keys.actEdge=true; if(k==='fire'&&!keys.fire) keys.fireEdge=true; keys[k]=true; e.preventDefault(); }});
+const keys={left:false,right:false,jump:false,jumpEdge:false,act:false,actEdge:false,fire:false,fireEdge:false,dash:false,dashEdge:false,pound:false,poundEdge:false};
+const KM={ArrowLeft:'left',a:'left',A:'left',ArrowRight:'right',d:'right',D:'right',ArrowUp:'jump',w:'jump',W:'jump',' ':'jump',Shift:'act',f:'fire',F:'fire',z:'fire',Z:'fire',Control:'fire',x:'dash',X:'dash',c:'dash',C:'dash',ArrowDown:'pound',s:'pound',S:'pound'};
+addEventListener('keydown',e=>{ const k=KM[e.key]; if(k){ if(k==='jump'&&!keys.jump) keys.jumpEdge=true; if(k==='act'&&!keys.act) keys.actEdge=true; if(k==='fire'&&!keys.fire) keys.fireEdge=true; if(k==='dash'&&!keys.dash) keys.dashEdge=true; if(k==='pound'&&!keys.pound) keys.poundEdge=true; keys[k]=true; e.preventDefault(); }});
 addEventListener('keyup',e=>{ const k=KM[e.key]; if(k){ keys[k]=false; e.preventDefault(); }});
 function hold(id,k){ const el=document.getElementById(id);
-  el.addEventListener('pointerdown',e=>{ e.preventDefault(); if(k==='jump'&&!keys.jump)keys.jumpEdge=true; if(k==='act'&&!keys.act)keys.actEdge=true; if(k==='fire'&&!keys.fire)keys.fireEdge=true; keys[k]=true; });
+  el.addEventListener('pointerdown',e=>{ e.preventDefault(); if(k==='jump'&&!keys.jump)keys.jumpEdge=true; if(k==='act'&&!keys.act)keys.actEdge=true; if(k==='fire'&&!keys.fire)keys.fireEdge=true; if(k==='dash'&&!keys.dash)keys.dashEdge=true; if(k==='pound'&&!keys.pound)keys.poundEdge=true; keys[k]=true; });
   const up=()=>keys[k]=false;
   el.addEventListener('pointerup',up); el.addEventListener('pointerleave',up); el.addEventListener('pointercancel',up);
 }
-hold('left','left'); hold('right','right'); hold('jump','jump'); hold('act','act'); hold('fire','fire');
+hold('left','left'); hold('right','right'); hold('jump','jump'); hold('act','act'); hold('fire','fire'); hold('dash','dash'); hold('pound','pound');
 
 // ---------- physics helpers ----------
 const G=2100, RUN=250, ACC=1900, FRIC=1700, AIRACC=1500, JUMP=640, MAXFALL=1000;
@@ -1464,9 +1474,11 @@ function update(dt){
       projectiles.push({x:pl.x+pl.w/2, y:pl.y+6, vx:pl.face*470, vy:-100, life:2.5, friendly:true, shell:true, col:pl.carryCol}); }
     else if(pl.bubbles>0){ pl.bubbles--; sfx('bubble'); pl.shootFlash=0.09;
       projectiles.push({x:pl.face>0?pl.x+pl.w+10:pl.x-10, y:pl.y+pl.h*0.4, vx:pl.face*250, vy:-20, life:2.6, friendly:true, bubble:true}); }
-    else if((has('pound')||pl.drillT>0) && !pl.onGround && !pl.pounding){ pl.pounding=true; pl.vy=POUND*(pl.gflip?-1:1); pl.vx=0; }
-    else if(has('dash') && pl.dashCd<=0){ pl.dashT=DASH_TIME; pl.dashCd=DASH_CD; pl.vy=Math.min(pl.vy,0); }
   }
+  if(keys.dashEdge){ keys.dashEdge=false;                                   // 💨 always dash, never anything else
+    if(pl.dashCd<=0 && !pl.inCannon){ pl.dashT=DASH_TIME; pl.dashCd=DASH_CD; pl.vy=Math.min(pl.vy,0); sfx('spring'); } }
+  if(keys.poundEdge){ keys.poundEdge=false;                                 // ⬇️ always ground pound
+    if(!pl.onGround && !pl.pounding && !pl.inCannon){ pl.pounding=true; pl.vy=POUND*(pl.gflip?-1:1); pl.vx=0; } }
   // 🔫 the blaster is permanent now — coins ARE the bullets (⭐ presents load golden shots)
   if(pl.fireCd>0) pl.fireCd-=dt;
   if((keys.fire||keys.fireEdge) && !(pl.fireCd>0) && !pl.inCannon){
@@ -1527,7 +1539,14 @@ function update(dt){
   const wasAir=!pl.onGround;
   const hitD=moveY(pl,pl.vy*dt);
   const landed=pl.gflip?moveYHitUp:hitD;
-  if(landed){ if(pl.onGround===false && wasAir) {} pl.onGround=true; pl.jumps=0; if(pl.pounding){ pl.pounding=false; poundShake=0.25; }
+  if(landed){ if(pl.onGround===false && wasAir) {} pl.onGround=true; pl.jumps=0;
+    if(pl.pounding){ pl.pounding=false; poundShake=0.3; sfx('bosshit');
+      const sx6=pl.x+pl.w/2, sy6=pl.y+pl.h;                       // 💥 shockwave
+      shock.push({x:sx6, y:sy6, t:0.42});
+      for(const en2 of enemies){ if(!en2.alive||en2.bubbled>0) continue;
+        if(Math.abs(en2.x+en2.w/2-sx6)<120 && Math.abs(en2.y+en2.h-sy6)<70) hurtEnemy(en2,1); }
+      if(boss&&boss.alive&&boss.active&&boss.inv<=0&&Math.abs(boss.x+boss.w/2-sx6)<130&&Math.abs(boss.y+boss.h-sy6)<80) bossHit();
+    }
     if(chaosFx==='bouncy' && !inW) pl.vy=-470*gs2; }   // 🦘 the floor is a trampoline
   else pl.onGround=false;
   // 🪝 swinging: hold jump to hang on, release to FLING
@@ -1629,7 +1648,7 @@ function update(dt){
         hitPlayer();
       }
       else if(pl.big) hurtEnemy(en,3);                          // giant hero crushes
-      else if(above || pl.pounding){ if(!pl.pounding) pl.vy=-460; hurtEnemy(en, pl.pounding?2:1); }
+      else if(above || pl.pounding){ if(!pl.pounding) pl.vy=-460; hurtEnemy(en, pl.pounding?3:1); }
       else if(ram){ if(hurtEnemy(en,2)) pl.vx*=0.72; else pl.vx*=-0.4; }
       else hitPlayer();
     }
@@ -1881,7 +1900,7 @@ function update(dt){
   cam.y=Math.max(-40,Math.min(pl.y+p.h/2-VH/2, H*TILE-VH));
   if(poundShake>0) poundShake-=dt;
 }
-let poundShake=0, rainT=0;
+let poundShake=0, rainT=0, shock=[];
 function rectHit(a,b){ return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y; }
 function bossHit(){ const b=boss; if(!b||!b.alive) return;
   b.hp-=1+(questMode?uLv('mig'):0); b.inv=0.9; addPop(b.x+b.w/2,b.y+10); sfx('bosshit');
@@ -2186,6 +2205,10 @@ function render(){
   for(const xp of xpPops){ const a2=Math.max(0,Math.min(1,xp.t));
     ctx.font='bold 15px sans-serif'; ctx.fillStyle='rgba(20,14,0,'+(a2*0.5)+')'; ctx.fillText('+'+xp.n+' XP',xp.x+1,xp.y+1);
     ctx.fillStyle='rgba(255,222,90,'+a2+')'; ctx.fillText('+'+xp.n+' XP',xp.x,xp.y); }
+  // 💥 pound shockwaves
+  for(const sk of shock){ const a3=sk.t/0.42, r3=(1-a3)*130+10;
+    ctx.strokeStyle='rgba(255,240,180,'+(a3*0.9)+')'; ctx.lineWidth=5*a3+1;
+    ctx.beginPath(); ctx.ellipse(sk.x,sk.y,r3,r3*0.35,0,0,7); ctx.stroke(); }
   // pops
   for(const pop of pops){ const a=pop.t/0.35; ctx.strokeStyle='rgba(255,255,255,'+a+')'; ctx.lineWidth=3;
     ctx.beginPath(); ctx.arc(pop.x,pop.y,(1-a)*22+6,0,7); ctx.stroke(); }
@@ -2728,11 +2751,17 @@ function loop(ts){ let dt=Math.min(0.033,(ts-last)/1000)||0; last=ts;
   if(chaosFx==='turbo'&&(state==='play'||state==='dying')) dt*=1.35;   // ⚡ everything faster
   update(dt);
   for(let i=pops.length-1;i>=0;i--){ pops[i].t-=dt; if(pops[i].t<=0) pops.splice(i,1); }
+  for(let i=shock.length-1;i>=0;i--){ shock[i].t-=dt; if(shock[i].t<=0) shock.splice(i,1); }
   if(toasts) for(let i=toasts.length-1;i>=0;i--){ toasts[i].t-=dt; toasts[i].y-=28*dt; if(toasts[i].t<=0) toasts.splice(i,1); }
   if(coins) for(let i=coins.length-1;i>=0;i--){ const c=coins[i]; if(c.fall&&c.y>H*TILE+40) coins.splice(i,1); }  // rain coins lost to pits
   for(const pid in mp.players){ if(mp.players[pid].emoteT>0) mp.players[pid].emoteT-=dt; }
   document.getElementById('emoteBar').classList.toggle('hidden', !(mp.active&&(state==='play'||state==='dying')));
   render(); drawHUD();
+  if(p){ const playing=(state==='play'||state==='dying');
+    document.getElementById('act').classList.toggle('off', !(playing&&(p.carry||p.bubbles>0)));
+    document.getElementById('dash').classList.toggle('off', !(playing&&p.dashCd<=0));
+    document.getElementById('pound').classList.toggle('off', !(playing&&!p.onGround));
+    document.getElementById('fire').classList.toggle('off', !(playing&&(coinsGot>0||p.stars>0))); }
   requestAnimationFrame(loop);
 }
 buildLevel(menuLevel); resetPlayer(); buildMenu();   // resetPlayer() creates cam/p so the first render frame doesn't crash
