@@ -225,7 +225,7 @@
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
-const APP_VERSION='v39';
+const APP_VERSION='v40';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -415,9 +415,11 @@ function dropLoot(en){ if(hatIs('pirate')) coins.push({x:en.x+en.w/2, y:en.y-4, 
   if(en.elite){ for(let k=0;k<3;k++) spawnOrb(en.x+en.w/2, en.y+en.h/2, 8); coins.push({x:en.x+en.w/2, y:en.y-8, got:false}); }
   else spawnOrb(en.x+en.w/2, en.y+en.h/2, 8); }   // every enemy death also drops XP in quest mode
 // one place where enemies take damage — returns true if it died
-function hurtEnemy(en,dmg){
+function hurtEnemy(en,dmg,daze){
   en.hp=(en.hp==null?1:en.hp)-dmg;
-  if(en.hp>0){ en.flash=0.22; en.kb=0.18; addPop(en.x+en.w/2,en.y+6); sfx('bosshit'); return false; }
+  if(en.hp>0){ en.flash=0.22; en.kb=0.09; addPop(en.x+en.w/2,en.y+6); sfx('bosshit');
+    if(daze) en.daze=Math.max(en.daze||0,daze);      // staggered where it stands so you can hit it again
+    return false; }
   en.alive=false; addPop(en.x+en.w/2,en.y); sfx('stomp'); dropLoot(en); spawnShell(en); return true;
 }
 function spawnShell(en){ shells.push({x:en.x+en.w/2-15, y:en.y+en.h-12, w:30, h:12, t:6,
@@ -1557,13 +1559,15 @@ function update(dt){
         if(!pl.pounding&&!pl.big) pl.vy=-460; hurtEnemy(en,3); }      // frozen enemies die easy
       continue; }
     if(en.flash>0) en.flash-=dt;
-    if(en.kb>0){ en.kb-=dt; en.x+=(en.x+en.w/2<pl.x+pl.w/2?-1:1)*160*dt; }
+    if(en.kb>0){ en.kb-=dt; en.x+=(en.x+en.w/2<pl.x+pl.w/2?-1:1)*90*dt; }
+    if(en.daze>0) en.daze-=dt;
     if(et==='fly'){
       // hovers, and DIVE-BOMBS you when you pass underneath
-      en.vx=(remixOn?104:88)*en.dir*(en.elite?1.2:1);
+      en.vx=(en.daze>0?0:(remixOn?104:88)*en.dir*(en.elite?1.2:1));
       if(moveX(en,en.vx*dt)) en.dir*=-1;
       en.phase+=dt;
-      if(en.dive>0){ en.dive-=dt; en.y+=560*dt; }
+      if(en.daze>0){ /* dazed: just hover */ }
+      else if(en.dive>0){ en.dive-=dt; en.y+=560*dt; }
       else{
         en.diveCd=(en.diveCd||0)-dt;
         const under=pl.y>en.y+30 && Math.abs((pl.x+pl.w/2)-(en.x+en.w/2))<80;
@@ -1575,8 +1579,8 @@ function update(dt){
       // stationary turret: settles on ground, fires toward the player on a cooldown
       en.vy+=G*dt; en.vy=Math.min(en.vy,MAXFALL); moveY(en,en.vy*dt);
       en.dir=(pl.x+pl.w/2 < en.x+en.w/2)?-1:1;
-      en.t-=dt;
-      if(en.t<=0 && Math.abs((pl.y+pl.h/2)-(en.y+en.h/2))<TILE*5 && Math.abs(pl.x-en.x)<VW*0.75){
+      if(en.daze<=0||en.daze==null) en.t-=dt;
+      if(en.t<=0 && !(en.daze>0) && Math.abs((pl.y+pl.h/2)-(en.y+en.h/2))<TILE*5 && Math.abs(pl.x-en.x)<VW*0.75){
         en.t=en.elite?0.85:1.15; sfx('shoot');
         // aims where you ARE (and a little where you're going) instead of straight ahead
         const sx0=en.dir>0?en.x+en.w:en.x, sy0=en.y+12;
@@ -1587,6 +1591,7 @@ function update(dt){
     else { // walk, spiker, brute, jump, chase — grounded patrollers
       let spd = et==='brute'?46 : et==='spiker'?86 : (remixOn?100:78);
       if(en.elite) spd*=1.2;
+      if(en.daze>0) spd=0;
       if(et==='chase'){
         const near=Math.abs((pl.x+pl.w/2)-(en.x+en.w/2))<380 && Math.abs((pl.y+pl.h/2)-(en.y+en.h/2))<110;
         en.chasing=near;
@@ -1594,8 +1599,8 @@ function update(dt){
       }
       en.vx=spd*en.dir;
       en.vy+=G*dt; en.vy=Math.min(en.vy,MAXFALL);
-      if(et==='jump'){ en.t-=dt;
-        if(en.t<=0 && en.onGround){ en.dir=(pl.x+pl.w/2<en.x+en.w/2)?-1:1;   // hops toward you now
+      if(et==='jump'){ if(!(en.daze>0)) en.t-=dt;
+        if(en.t<=0 && en.onGround && !(en.daze>0)){ en.dir=(pl.x+pl.w/2<en.x+en.w/2)?-1:1;   // hops toward you now
           en.vy=-660; en.onGround=false; en.t=1.05; } }
       // chasers leap gaps and walls to keep after you
       if(et==='chase' && en.chasing && en.onGround){
@@ -1614,15 +1619,15 @@ function update(dt){
     if(en.y>H*TILE+80){ en.alive=false; continue; }
     // vs player — stomp/pound from above kills; flyers count too
     if(pl.hurt<=0 && !pl.inCannon && rectHit(pl,en)){
-      const above=(pl.vy>0 && (pl.y+pl.h)-en.y < 22);
+      const above=(pl.vy>0 && (pl.y+pl.h)-en.y < 30);
       const ram=skate&&skate.state==='ride' && (pl.onGround||pl.coyote>0) && Math.abs(pl.vx)>240;
       if(en.armor && !pl.big && !pl.pounding){                  // 🦔 spikes — stomping this one HURTS
         if(above) pl.vy=-380;
         hitPlayer();
       }
       else if(pl.big) hurtEnemy(en,3);                          // giant hero crushes
-      else if(above || pl.pounding){ if(!pl.pounding) pl.vy=-460; hurtEnemy(en, pl.pounding?3:1); }
-      else if(ram){ if(hurtEnemy(en,2)) pl.vx*=0.72; else pl.vx*=-0.4; }
+      else if(above || pl.pounding){ if(!pl.pounding) pl.vy=-460; hurtEnemy(en, pl.pounding?3:2, 0.7); }
+      else if(ram){ if(hurtEnemy(en,2,0.7)) pl.vx*=0.72; else pl.vx*=-0.4; }
       else hitPlayer();
     }
   }
@@ -2294,6 +2299,8 @@ function drawEnemy(en){ const et=en.type||'walk';
   if(en.elite){ const gl=0.16+0.1*Math.sin(performance.now()/200);   // 👑 elite aura
     ctx.fillStyle='rgba(255,215,90,'+gl+')'; ctx.beginPath(); ctx.arc(en.x+en.w/2,en.y+en.h/2,en.w*0.9,0,7); ctx.fill();
     ctx.fillStyle='rgba(255,225,120,.95)'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.fillText('👑',en.x+en.w/2,en.y-8); }
+  if(en.daze>0){ ctx.fillStyle='rgba(255,255,255,.95)'; ctx.font='13px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('💫',en.x+en.w/2+Math.sin(performance.now()/90)*7,en.y-16); }
   if((en.maxhp||1)>1 && en.alive){                                    // hp pips
     const n=en.maxhp, left=Math.max(0,en.hp);
     for(let k=0;k<n;k++){ ctx.fillStyle=k<left?'#ff5a7a':'rgba(255,255,255,.25)';
