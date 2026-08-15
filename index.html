@@ -170,6 +170,15 @@
   <div class="sub" style="margin-top:8px">Move: ◀ ▶ · Jump: ▲ / Space · <b>🔫 Shoot</b> (F) · <b>💨 Dash</b> (X) · <b>⬇️ Pound</b> (↓) · ✦ throw (Shift) — coins are your bullets!</div>
 </div>
 
+<div class="overlay hidden" id="adScreen" style="justify-content:center">
+  <div style="font-size:54px">🎁</div>
+  <div class="big win" style="font-size:clamp(26px,7vw,44px)" id="adTitle">FREE REWARD</div>
+  <div class="sub" id="adSub">Watch a short video to claim it!</div>
+  <button class="play" id="adWatch">▶ WATCH</button>
+  <button class="chip" id="adSkip" style="margin-top:12px">No thanks</button>
+  <div class="sub" id="adPlaying" style="margin-top:14px"></div>
+</div>
+
 <div class="overlay hidden" id="lvlScreen" style="justify-content:center">
   <div class="big win" id="lvlTitle">LEVEL UP!</div>
   <div class="sub" id="lvlSub"></div>
@@ -218,14 +227,15 @@
 <div class="overlay hidden" id="overScreen">
   <div class="big" id="resultText">LEVEL CLEAR!</div>
   <div class="sub" id="resultSub"></div>
+  <button class="play" id="adBtn" style="background:linear-gradient(180deg,#ffe08a,#e0a020);color:#3a2600;display:none">🎁 BONUS</button>
   <button class="play" id="nextBtn">NEXT LEVEL ▶</button>
   <button class="chip" id="againBtn" style="margin-top:12px">↺ Replay level</button>
   <button class="chip" id="overMenu" style="margin-top:12px">← Menu / change hero</button>
 </div>
 
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="peerjs.min.js"></script>
 <script>
-const APP_VERSION='v40';
+const APP_VERSION='v41';
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const VW=880, VH=520, TILE=40;
 cv.width=VW; cv.height=VH;
@@ -277,6 +287,58 @@ function starsFor(i){ let s=clearStore[i]?1:0;
 function totalStars(){ let n=0; for(let i=0;i<LEVELS.length;i++) n+=starsFor(i); return n; }
 function advOpen(i){ if(i>0 && !clearStore[i-1]) return false;
   if(GATES[i]!=null && totalStars()<GATES[i]) return false; return true; }
+// ---------- rewarded ads 🎁 ----------
+// Opt-in videos only: the player always chooses to watch and always gets something.
+// Until a real ad network is wired in below, this runs in practice mode (a short
+// countdown, then the reward) so every placement is playable and testable today.
+//
+// ► TO GO LIVE WITH ADMOB (inside the Capacitor app):
+//   1. npm i @capacitor-community/admob   and sync the native projects
+//   2. put your rewarded ad unit ids in AD_UNITS below
+//   3. that's it — playRewarded() prefers the native plugin whenever it exists
+const AD_UNITS={
+  ios:     'ca-app-pub-3940256099942544/1712485313',   // ← replace with YOUR iOS rewarded unit
+  android: 'ca-app-pub-3940256099942544/5224354917',   // ← replace with YOUR Android rewarded unit
+};                                                     // (these defaults are Google's public TEST units)
+const AD={ busy:false, cb:null, t:0, questRevives:0, shopT:0, dblUsed:false };
+function admobPlugin(){ try{ return window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.AdMob; }catch(e){ return null; } }
+function adsOn(){ return true; }   // flip to false to strip every ad prompt
+async function playRewarded(){
+  const A=admobPlugin();
+  if(A){                                   // real video when running inside the app
+    try{
+      const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
+      await A.prepareRewardVideoAd({ adId: isIOS?AD_UNITS.ios:AD_UNITS.android });
+      const r=await A.showRewardVideoAd();
+      return !!r;                          // reward only if the video actually completed
+    }catch(e){ return false; }
+  }
+  return await practiceAd();               // browser / practice mode
+}
+function practiceAd(){
+  return new Promise(res=>{
+    const el=document.getElementById('adPlaying'); let n=3;
+    document.getElementById('adWatch').style.display='none';
+    document.getElementById('adSkip').style.display='none';
+    el.textContent='📺 (practice video) '+n+'…';
+    const iv=setInterval(()=>{ n--;
+      if(n>0){ el.textContent='📺 (practice video) '+n+'…'; return; }
+      clearInterval(iv); el.textContent=''; res(true);
+    },700);
+  });
+}
+function offerAd(title,sub,onReward){
+  if(!adsOn()) return false;
+  AD.cb=onReward;
+  document.getElementById('adTitle').textContent=title;
+  document.getElementById('adSub').textContent=sub;
+  document.getElementById('adPlaying').textContent='';
+  document.getElementById('adWatch').style.display='';
+  document.getElementById('adSkip').style.display='';
+  document.getElementById('adScreen').classList.remove('hidden');
+  return true;
+}
+function closeAdScreen(){ document.getElementById('adScreen').classList.add('hidden'); AD.cb=null; }
 // ---------- quest mode 🗡️ — endless floors, XP, levels, permanent upgrades ----------
 let questMode=false, questFloor=1, orbs=[], xpPops=[], lvlQueue=0;
 let qs={lv:1, xp:0, pts:0, upg:{}, deepest:0};
@@ -357,7 +419,7 @@ function genQuestFloor(n){
     } };
 }
 function buildQuestFloor(){ buildLevel(0, genQuestFloor(questFloor)); orbs=[]; xpPops=[]; }
-function startQuest(){ rushMode=false; dailyMode=false; customMode=false; survMode=false; advMode=false; editMode=false;
+function startQuest(){ AD.questRevives=0; rushMode=false; dailyMode=false; customMode=false; survMode=false; advMode=false; editMode=false;
   questMode=true; remixOn=false; questFloor=1; lvlQueue=0;
   buildQuestFloor(); resetPlayer(); state='play'; winFlash=0; deathTimer=0; hideOverlays(); setTrack('cave');
   toasts.push({x:p.x+12, y:p.y-30, ic:'🗡️ LV '+qs.lv, t:2}); }
@@ -1373,7 +1435,7 @@ function resetPlayer(){
   maxHearts=3+(has('heart')?1:0)+(questMode?uLv('vit'):0); hearts=maxHearts; coinsGot=0;
   cam={x:0,y:Math.max(0,H*TILE-VH)};   // start looking at the ground, not the empty sky
 }
-function startGame(idx, adv){ rushMode=false; dailyMode=false; customMode=false; editMode=false; survMode=false; questMode=false;
+function startGame(idx, adv){ AD.dblUsed=false; rushMode=false; dailyMode=false; customMode=false; editMode=false; survMode=false; questMode=false;
   advMode=!!adv; remixOn=advMode?false:!!sel.remix; if(idx==null) idx=menuLevel; menuLevel=((idx%LEVELS.length)+LEVELS.length)%LEVELS.length; saveHero(); buildLevel(menuLevel);
   if(remixOn) curName+=' 🔀';
   ghostPlay=(!remixOn&&ghostStoreObj[menuLevel])||null; ghostRec=[]; recT=0;
@@ -2488,7 +2550,9 @@ function drawHUD(){
 }
 
 // ---------- overlays / UI ----------
-function hideOverlays(){ ['startScreen','overScreen','victoryScreen','mapScreen','mpScreen','lvlScreen'].forEach(id=>document.getElementById(id).classList.add('hidden')); }
+function showAdBtn(label,fn){ const b=document.getElementById('adBtn'); b.textContent=label; b.style.display=''; b.onclick=fn; }
+function hideAdBtn(){ document.getElementById('adBtn').style.display='none'; }
+function hideOverlays(){ ['startScreen','overScreen','victoryScreen','mapScreen','mpScreen','lvlScreen','adScreen'].forEach(id=>document.getElementById(id).classList.add('hidden')); hideAdBtn(); }
 function openMap(){ state='start'; hideOverlays(); buildMap(); document.getElementById('mapScreen').classList.remove('hidden'); setTrack('title'); }
 function buildMap(){
   document.getElementById('mapStars').textContent='⭐ '+totalStars()+' / '+(LEVELS.length*3);
@@ -2544,6 +2608,10 @@ function win(){ sfx('win'); bank+=coinsGot; saveBank();
   const best=timeStore[curLevel];
   document.getElementById('resultSub').textContent='Nice! '+coinsGot+' coins left (bullets spent count!), '+hearts+' ❤️ left. ⏱ '+fmtT(t)+(med?' '+med:'')+' (best '+fmtT(best)+').'+rivalNote+' Up next: '+LEVELS[curLevel+1].name+'!';
   document.getElementById('againBtn').textContent='↺ Replay level';
+  if(adsOn()&&coinsGot>0&&!AD.dblUsed) showAdBtn('🎁 DOUBLE '+coinsGot+' 🪙',
+    ()=>offerAd('DOUBLE YOUR COINS!','Watch a short video to bank '+coinsGot+' extra coins.',()=>{
+      AD.dblUsed=true; bank+=coinsGot; saveBank(); hideAdBtn();
+      document.getElementById('resultSub').textContent='🎁 Doubled! +'+coinsGot+' extra coins banked — you now have '+bank+' 🪙.'; }));
   document.getElementById('nextBtn').style.display='';
   o.classList.remove('hidden'); }
 function showVictory(){
@@ -2568,6 +2636,10 @@ function lose(){ setTrack(null); bank+=coinsGot; saveBank();
   const o=document.getElementById('overScreen'), rt=document.getElementById('resultText'); rt.textContent='OUCH! 💥'; rt.className='big lose';
   if(questMode){ saveQuest();
     document.getElementById('resultSub').textContent='Run over on Floor '+questFloor+'. You are LV '+qs.lv+' — deepest F'+qs.deepest+'. Your levels and powers are kept forever, so dive again stronger!';
+    if(adsOn()&&AD.questRevives<2) showAdBtn('🎁 CONTINUE on Floor '+questFloor,
+      ()=>offerAd('KEEP GOING!','Watch a short video to carry on from Floor '+questFloor+' with full hearts.',()=>{
+        AD.questRevives++; hideOverlays(); buildQuestFloor(); resetPlayer(); state='play'; winFlash=0; deathTimer=0;
+        setTrack(questFloor%5===0?'boss':'cave'); toasts.push({x:p.x+12,y:p.y-30,ic:'🎁 REVIVED',t:2}); }));
     document.getElementById('againBtn').textContent='🗡️ Dive again';
     document.getElementById('nextBtn').style.display='none';
     o.classList.remove('hidden'); return; }
@@ -2593,6 +2665,13 @@ function buildMenu(){
   document.getElementById('bankAmt').textContent=bank;
   document.getElementById('myLvlBtn').style.display=hasCustom()?'':'none';
   const sr=document.getElementById('shopRow'); sr.innerHTML='';
+  if(adsOn()){ const d0=document.createElement('div'); const cool=AD.shopT>performance.now();
+    d0.className='chip'+(cool?'':' sel'); d0.style.opacity=cool?'0.5':'';
+    d0.textContent=cool?'🎁 more coins soon…':'🎁 Free 150 🪙 — watch a video';
+    d0.onclick=()=>{ if(AD.shopT>performance.now()) return;
+      offerAd('FREE COINS!','Watch a short video for 150 coins in your piggy bank.',()=>{
+        bank+=150; saveBank(); AD.shopT=performance.now()+180000; buildMenu(); }); };
+    sr.appendChild(d0); }
   SHOP.forEach(it=>{ const d=document.createElement('div'); const owned=shopState.owned.includes(it.id);
     const equipped=(it.kind==='pet'&&shopState.pet===it.id)||(it.kind==='trail'&&shopState.trail===it.id)||(it.kind==='color'&&sel.color===it.col);
     d.className='chip'+(equipped?' sel':''); d.style.opacity=owned||bank>=it.cost?'':'0.5';
@@ -2644,6 +2723,13 @@ document.getElementById('advBtn').onclick=()=>openMap();
 document.getElementById('mapBack').onclick=()=>toMenu();
 document.getElementById('survBtn').onclick=()=>{ saveHero(); startSurvival(); };
 document.getElementById('questBtn').onclick=()=>{ saveHero(); startQuest(); };
+document.getElementById('adSkip').onclick=()=>closeAdScreen();
+document.getElementById('adWatch').onclick=async()=>{
+  if(AD.busy) return; AD.busy=true;
+  const fn=AD.cb, earned=await playRewarded();
+  AD.busy=false; closeAdScreen();
+  if(earned&&fn) fn(); else if(!earned) toMenu&&0;
+};
 document.getElementById('mpBtn').onclick=()=>{ state='start'; hideOverlays(); document.getElementById('mpScreen').classList.remove('hidden'); mpAutoJoin(); updHostRow(); };
 document.getElementById('mpRetry').onclick=()=>mpAutoJoin();
 document.getElementById('mpBack').onclick=()=>toMenu();

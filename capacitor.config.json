@@ -1,0 +1,11 @@
+{
+  "appId": "com.hopquest.game",
+  "appName": "Hop Quest",
+  "webDir": "www",
+  "backgroundColor": "#0e1630",
+  "android": { "backgroundColor": "#0e1630" },
+  "ios": { "contentInset": "always", "backgroundColor": "#0e1630" },
+  "plugins": {
+    "SplashScreen": { "launchAutoHide": true, "backgroundColor": "#0e1630" }
+  }
+}
