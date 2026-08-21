@@ -306,6 +306,19 @@ function ziPrime(){
     const u=new SpeechSynthesisUtterance(''); u.lang='zh-CN'; u.volume=0; speechSynthesis.speak(u);
   }catch(e){}
 }
+// White fill + heavy dark outline so the character reads against every body colour —
+// walker purple, brute brown, spiker slate, chaser red, flyer pink, box lids.
+function drawZi(o, cx, cy, size){
+  if(!ziOn) return;
+  const z=ziOf(o);
+  ctx.save();
+  ctx.font='bold '+size+'px '+ZIFONT;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.lineJoin='round'; ctx.lineWidth=Math.max(3,size*0.24);
+  ctx.strokeStyle='rgba(18,10,34,.92)'; ctx.strokeText(z.z,cx,cy);
+  ctx.fillStyle='#fff'; ctx.fillText(z.z,cx,cy);
+  ctx.restore();
+}
 function ziSay(z){
   if(!sfxOn||!window.speechSynthesis) return;
   try{
@@ -2385,6 +2398,7 @@ function drawBox(bx){ const x=bx.x, y=bx.y, w=bx.w, h=bx.h;
     ctx.fillStyle=col; ctx.fillRect(x-3,y,w+6,10);
     ctx.fillStyle='rgba(0,0,0,.15)'; ctx.fillRect(x-3,y+8,w+6,3);
     ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(x+w/2-6,y-2,5,0,7); ctx.arc(x+w/2+6,y-2,5,0,7); ctx.fill();
+    drawZi(bx, x+w/2, y+22, 20);
   } else { // opened, lid off
     ctx.fillStyle='rgba(0,0,0,.25)'; roundRect(x+2,y+16,w-4,h-16,4); ctx.fill();
     ctx.fillStyle=col; roundRect(x,y+14,w,h-14,4); ctx.fill();
@@ -2402,8 +2416,8 @@ function drawEnemy(en){ const et=en.type||'walk';
     const n=en.maxhp, left=Math.max(0,en.hp);
     for(let k=0;k<n;k++){ ctx.fillStyle=k<left?'#ff5a7a':'rgba(255,255,255,.25)';
       ctx.fillRect(en.x+en.w/2-(n*5)/2+k*5, en.y-(en.elite?18:5), 4, 3); } }
-  if(et==='fly') return drawFlyer(en);
-  if(et==='shoot') return drawShooter(en);
+  if(et==='fly'){ drawFlyer(en); drawZi(en,en.x+en.w/2,en.y+en.h/2+1,16); return; }
+  if(et==='shoot'){ drawShooter(en); drawZi(en,en.x+en.w/2,en.y+en.h/2+8,15); return; }   // below the gun barrel
   const cx=en.x+en.w/2, cy=en.y+en.h/2, wob=Math.sin(performance.now()/120+en.x)*2;
   ctx.fillStyle='rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(cx,en.y+en.h,en.w*0.5,4,0,0,7); ctx.fill();
   const body = et==='chase' ? (en.chasing?'#ef4a3a':'#d0603b') : et==='jump' ? '#3ba05c'
@@ -2425,10 +2439,11 @@ function drawEnemy(en){ const et=en.type||'walk';
   if(et==='chase'){ // angry brows + frown
     ctx.strokeStyle='#5a1010'; ctx.lineWidth=2;
     ctx.beginPath(); ctx.moveTo(cx-10,cy-8); ctx.lineTo(cx-3,cy-5); ctx.moveTo(cx+10,cy-8); ctx.lineTo(cx+3,cy-5); ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx,cy+9,3,1.15*Math.PI,1.85*Math.PI); ctx.stroke();
-  } else {
+    if(!ziOn){ ctx.beginPath(); ctx.arc(cx,cy+9,3,1.15*Math.PI,1.85*Math.PI); ctx.stroke(); }
+  } else if(!ziOn) {
     ctx.strokeStyle=et==='jump'?'#1f5c34':'#3a1f5c'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy+6,3,0.15*Math.PI,0.85*Math.PI); ctx.stroke();
   }
+  drawZi(en,cx,cy+8,en.w>34?20:17);   // sits where the mouth was — under the eyes, on the widest part of the body
 }
 function drawFlyer(en){ const cx=en.x+en.w/2, cy=en.y+en.h/2, f=Math.abs(Math.sin(performance.now()/70))*5;
   ctx.fillStyle='rgba(0,0,0,.12)'; ctx.beginPath(); ctx.ellipse(cx,en.baseY+en.h+26,en.w*0.4,3,0,0,7); ctx.fill();
