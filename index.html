@@ -291,6 +291,34 @@ function ziDraw(){
 // arenas, and the mirrored/remixed copies made by object spread.
 function ziOf(o){ if(o.zi==null) o.zi=ziDraw(); return ZI[o.zi]; }
 
+// Web Speech API. Three guards: primed on first gesture (iOS refuses otherwise),
+// cancel() before each word so chain-stomps don't queue up ten of them, and a silent
+// skip when the device has no Chinese voice — the visual pop still happens.
+function ziVoice(){
+  try{ const vs=speechSynthesis.getVoices()||[];
+    const zh=vs.filter(x=>/^zh/i.test(x.lang) && !/^zh-HK/i.test(x.lang));   // zh-HK is Cantonese — wrong pronunciation to learn
+    return {list:vs, v:zh.find(x=>/^zh-CN/i.test(x.lang)) || zh[0] || null}; }
+  catch(e){ return {list:[], v:null}; }
+}
+function ziPrime(){
+  try{ if(!window.speechSynthesis) return;
+    speechSynthesis.getVoices();
+    const u=new SpeechSynthesisUtterance(''); u.lang='zh-CN'; u.volume=0; speechSynthesis.speak(u);
+  }catch(e){}
+}
+function ziSay(z){
+  if(!sfxOn||!window.speechSynthesis) return;
+  try{
+    const vv=ziVoice();
+    if(vv.list.length && !vv.v) return;      // voices loaded but none is Chinese — stay silent
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(z);
+    u.lang='zh-CN'; u.rate=0.8;              // slow enough for a beginner to catch the tone
+    if(vv.v) u.voice=vv.v;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+
 // ---------- 汉字 mode — self-check (open with ?zicheck) ----------
 function ziCheck(){
   const fail=[], seenZ={};
@@ -2060,7 +2088,7 @@ function runMusic(){ if(!musicOn||!curTrack||!ensureCtx()) return;
 function stopMusic(){ if(mus.timer){ clearInterval(mus.timer); mus.timer=null; } }
 function setTrack(name){ if(name===curTrack&&mus.timer) return; curTrack=name; stopMusic(); if(name) runMusic(); }
 // browsers only allow audio after a user gesture — retry on any input
-addEventListener('pointerdown',()=>runMusic(),true);
+addEventListener('pointerdown',()=>{ runMusic(); ziPrime(); },true);
 addEventListener('keydown',()=>runMusic(),true);
 document.addEventListener('visibilitychange',()=>{ if(document.hidden) stopMusic(); else runMusic(); });
 
