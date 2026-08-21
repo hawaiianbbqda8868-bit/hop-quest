@@ -549,13 +549,14 @@ function dropLoot(en){ if(hatIs('pirate')) coins.push({x:en.x+en.w/2, y:en.y-4, 
   if(en.elite){ for(let k=0;k<3;k++) spawnOrb(en.x+en.w/2, en.y+en.h/2, 8); coins.push({x:en.x+en.w/2, y:en.y-8, got:false}); }
   else spawnOrb(en.x+en.w/2, en.y+en.h/2, 8); }   // every enemy death also drops XP in quest mode
 // one place where enemies take damage — returns true if it died
-function hurtEnemy(en,dmg,daze){
+function hurtEnemy(en,dmg,daze,quiet){
   en.hp=(en.hp==null?1:en.hp)-dmg;
   if(en.hp>0){ en.flash=0.22; en.kb=0.09; addPop(en.x+en.w/2,en.y+6); sfx('bosshit');
     if(daze) en.daze=Math.max(en.daze||0,daze);      // staggered where it stands so you can hit it again
     return false; }
   en.alive=false; addPop(en.x+en.w/2,en.y); sfx('stomp'); dropLoot(en); spawnShell(en);
-  if(ziOn) ziCollect(ziOf(en), en.x+en.w/2, en.y-6);   // one hook covers stomps, pounds, blaster, shells
+  if(ziOn && !quiet) ziCollect(ziOf(en), en.x+en.w/2, en.y-6);   // one hook covers stomps, pounds, blaster, shells
+                                                                  // (quiet = the rival did it; it earns him nothing)
   return true;
 }
 function spawnShell(en){ shells.push({x:en.x+en.w/2-15, y:en.y+en.h-12, w:30, h:12, t:6,
@@ -1513,7 +1514,10 @@ function startGame(idx, adv){ rushMode=false; dailyMode=false; customMode=false;
   advMode=!!adv; remixOn=advMode?false:!!sel.remix; if(idx==null) idx=menuLevel; menuLevel=((idx%LEVELS.length)+LEVELS.length)%LEVELS.length; saveHero(); buildLevel(menuLevel);
   if(remixOn) curName+=' 🔀';
   ghostPlay=(!remixOn&&ghostStoreObj[menuLevel])||null; ghostRec=[]; recT=0;
-  rival=(sel.rival&&!advMode)?{x:startPx.x-30, y:startPx.y, w:24, h:30, vx:0, vy:0, onGround:false, done:false}:null;
+  rivalPath=null;
+  rival=(sel.rival&&!advMode)?{x:startPx.x-30, y:startPx.y, w:24, h:30, vx:0, vy:0, done:false,
+    mode:'run', jt:0, jdur:0.4, jx0:0, jy0:0, jx1:0, jy1:0, jarc:0,
+    coins:0, stagger:0, inv:0}:null;
   chaosFx=null; chaosLabel=''; chaosG=1;
   if(sel.chaos&&!advMode){ const ch2=CHAOS[(Math.random()*CHAOS.length)|0]; chaosFx=ch2[0]; chaosLabel=ch2[1];
     if(chaosFx==='giantfoes') enemies.forEach(en=>{ en.w=Math.round(en.w*1.5); en.h=Math.round(en.h*1.5); en.y-=en.h/3; });
@@ -1539,6 +1543,7 @@ hold('left','left'); hold('right','right'); hold('jump','jump'); hold('act','act
 
 // ---------- physics helpers ----------
 const G=2100, RUN=250, ACC=1900, FRIC=1700, AIRACC=1500, JUMP=640, MAXFALL=1000;
+const RIVALRUN=185;                     // 🏁 the speed the rival commits to for any jump
 const DASH_SPD=560, DASH_TIME=0.16, DASH_CD=0.7, GLIDE=150, POUND=1150;
 const SMALLW=24, SMALLH=30, BIGW=46, BIGH=58;   // hero size normal vs grown
 const GIFT_ICONS={heart:'❤️', shield:'🛡️', grow:'🍄', stars:'⭐', drill:'⛏️', bubble:'🫧', jet:'🚀'};
@@ -1564,6 +1569,47 @@ function moveY(e,dy){
     e.vy=0; return hitDown;
   }
   return false;
+}
+
+// ---------- 🏁 rival racing line ----------
+// These levels were authored for a human, not a pathfinder. Feeling the way forward with
+// collisions wedges the rival on the geometry, so instead the line is computed once from
+// the level's own surface: the standable row of every column, chosen for continuity with
+// the column before it. The rival runs that line and arcs over the gaps. It cannot stick.
+let rivalPath=null;
+function rivalStandRows(tx){
+  const rows=[];
+  for(let ty=1; ty<H; ty++) if(solidAt(tx,ty) && !solidAt(tx,ty-1) && !solidAt(tx,ty-2)) rows.push(ty);
+  return rows;
+}
+function buildRivalPath(){
+  rivalPath=new Array(W).fill(null);
+  let cur=null;
+  for(let tx=0; tx<W; tx++){
+    const rows=rivalStandRows(tx);
+    if(!rows.length) continue;
+    if(cur==null) cur=rows[rows.length-1];        // start on the main ground, not a rooftop
+    let best=rows[0], bd=Math.abs(rows[0]-cur);
+    for(const r of rows){ const d=Math.abs(r-cur); if(d<bd){ bd=d; best=r; } }
+    rivalPath[tx]=best; cur=best;
+  }
+}
+function rivalSurfaceY(tx,h){ const r=(rivalPath&&tx>=0&&tx<rivalPath.length)?rivalPath[tx]:null;
+  return r==null?null:r*TILE-h; }
+// next column ahead that can be landed on
+function rivalNextGround(tx,limit){
+  for(let i=tx; i<Math.min(rivalPath.length, tx+limit); i++) if(rivalPath[i]!=null) return i;
+  return -1;
+}
+function rivalLeap(R,tx2,tall){
+  const y1=rivalSurfaceY(tx2,R.h); if(y1==null) return false;
+  const x1=tx2*TILE+(TILE-R.w)/2;
+  if(x1<R.x+TILE*0.4) return false;        // never leap backwards or in place — that oscillates forever
+  R.jx0=R.x; R.jy0=R.y; R.jx1=x1; R.jy1=y1;
+  const dist=Math.max(TILE,R.jx1-R.jx0);
+  R.jdur=Math.max(0.30, dist/Math.max(100,R.vx));
+  R.jarc=(tall?150:52)+Math.max(0,R.jy0-R.jy1);
+  R.jt=0; R.mode='jump'; return true;
 }
 
 // ---------- update ----------
@@ -1963,18 +2009,64 @@ function update(dt){
       if(survT<=0){ hearts=Math.min(maxHearts,hearts+1); spawnWave(); survT=1.6; } }
     else survT=1.6;
   }
-  // rival racer 🏁 — intangible pace-runner heading for the flag
+  // rival racer 🏁 — runs the level's racing line, shares the level, keeps it close
   if(rival && !rival.done){ const R=rival;
-    R.vx=165;
-    if(R.onGround){
-      const ftx=Math.floor((R.x+R.w+10)/TILE), footY=Math.floor((R.y+R.h+2)/TILE);
-      let floorAhead=false; for(let dy2=0;dy2<4;dy2++) if(solidAt(ftx,footY+dy2)){ floorAhead=true; break; }
-      const wallAhead=solidAt(ftx,Math.floor((R.y+R.h*0.4)/TILE));
-      if(!floorAhead||wallAhead){ R.vy=-800; R.onGround=false; }
+    if(!rivalPath) buildRivalPath();
+
+    // --- pace: hunt the hero so the race stays neck-and-neck ---
+    const lead=(R.x-p.x)/TILE;
+    let spd=RIVALRUN;
+    if(lead>2) spd*=Math.max(0.78, 1-(lead-2)*0.045);          // comfortably ahead — ease off
+    else if(lead<-2) spd*=Math.min(1.55, 1+(-lead-2)*0.05);    // trailing — dig in
+    R.vx=spd;
+    if(R.inv>0) R.inv-=dt;
+
+    if(R.stagger>0){ R.stagger-=dt; }
+    else if(R.mode==='jump'){
+      R.jt+=dt;
+      const u=Math.min(1,R.jt/R.jdur);
+      R.x=R.jx0+(R.jx1-R.jx0)*u;
+      R.y=R.jy0+(R.jy1-R.jy0)*u-R.jarc*4*u*(1-u);
+      R.vy=(u<0.5?-320:320);                                   // for stomp checks and the lean
+      if(u>=1){ R.x=R.jx1; R.y=R.jy1; R.vy=0; R.mode='run'; }
+    } else {
+      R.x+=R.vx*dt; R.vy=0;
+      const tx=Math.floor((R.x+R.w/2)/TILE);
+      const sy=rivalSurfaceY(tx,R.h);
+      if(sy!=null) R.y=sy;
+
+      // a spring under foot: take the showy route
+      const sp=springs.find(q=>Math.abs((R.x+R.w/2)-(q.x+q.w/2))<TILE*0.7 && Math.abs((R.y+R.h)-q.y)<TILE*0.9);
+      if(sp){ let t2=rivalNextGround(tx+4,12);
+        while(t2>=0 && !rivalLeap(R,t2,true)) t2=rivalNextGround(t2+1,12);
+        if(R.mode==='jump') sp.t=0.3; }
+      else {
+        // an enemy in the way: hop it. Coming down on it is a stomp.
+        const foe=enemies.some(en=>en.alive && en.x+en.w>R.x+R.w &&
+          en.x-(R.x+R.w)<TILE*1.7 && (en.y+en.h)>R.y && en.y<R.y+R.h+TILE*0.6);
+        const here=rivalPath[tx], ahead=rivalPath[tx+1];
+        if(foe){ let t2=rivalNextGround(tx+2,10);
+          while(t2>=0 && !rivalLeap(R,t2,false)) t2=rivalNextGround(t2+1,10); }
+        else if(ahead==null){                                   // gap: arc to the far side
+          let t2=rivalNextGround(tx+1,24);
+          while(t2>=0 && !rivalLeap(R,t2,false)) t2=rivalNextGround(t2+1,24);
+        } else if(here!=null && ahead<here-1){                  // a step up worth hopping
+          rivalLeap(R,tx+1,false);                              // if refused, it just walks up
+        }
+      }
     }
-    R.vy+=G*dt; R.vy=Math.min(R.vy,MAXFALL);
-    moveX(R,R.vx*dt); R.onGround=moveY(R,R.vy*dt);
-    if(R.y>H*TILE+40){ R.y=-2*TILE; R.x+=TILE*2; R.vy=0; }      // fell — parachutes back in a bit ahead
+
+    // --- enemies ---
+    for(const en of enemies){ if(!en.alive) continue;
+      if(rectHit(R,en)){
+        if(R.mode==='jump' && R.jt>R.jdur*0.45){ hurtEnemy(en,2,0,true); }   // quiet: earns the hero nothing
+        else if(R.stagger<=0 && R.inv<=0){ R.stagger=0.3; R.inv=1.0; }
+      }
+    }
+    // --- coins: its own tally. They stay on the map — they're the hero's ammo ---
+    for(const c of coins){ if(c.got||c.rgot) continue;
+      if(Math.abs((R.x+R.w/2)-c.x)<22 && Math.abs((R.y+R.h/2)-c.y)<24){ c.rgot=true; R.coins++; } }
+
     if(R.x+R.w>flag.x){ R.done=true; toasts.push({x:R.x,y:R.y-22,ic:'🏁',t:1.6}); sfx('shoot'); }
   }
   // boss rush: beaten boss → grab the coin ring, then on to the next arena
@@ -2681,7 +2773,8 @@ function win(){ sfx('win'); bank+=coinsGot; saveBank();
   if(!remixOn && (old==null||t<old)){ timeStore[curLevel]=t; saveTimes();
     ghostStoreObj[curLevel]=ghostRec.slice(0,12000); saveGhosts(); }   // your best run becomes the ghost to race
   let rivalNote='';
-  if(rival){ if(!rival.done){ bank+=25; saveBank(); rivalNote=' You beat the rival! +25 🪙 bonus.'; } else rivalNote=' The rival got there first! 😜'; }
+  if(rival){ if(!rival.done){ bank+=25; saveBank(); rivalNote=' You beat the rival! +25 🪙 bonus.'; } else rivalNote=' The rival got there first! 😜';
+    rivalNote+=' (Rival grabbed '+rival.coins+' 🪙 — yours are all still there.)'; }
   if(mp.active&&mp.mode==='race'&&!mp.finished){ mp.finished=true;
     const wonRace=!mp.anyFinish; mp.anyFinish=true; mpSend({t:'finish', time:Math.round(levelT)});
     rivalNote+=wonRace?' 🏆 YOU WON THE FAMILY RACE!':' 🏁 Finished — someone was faster! 😜'; }
