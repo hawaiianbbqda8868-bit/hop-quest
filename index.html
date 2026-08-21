@@ -253,6 +253,75 @@ try{ const s=JSON.parse(localStorage.getItem('hopHero')||'null'); if(s){ sel.col
 function saveHero(){ try{ localStorage.setItem('hopHero', JSON.stringify({color:sel.color,hat:sel.hat,abil:[...sel.abil],level:menuLevel,remix:!!sel.remix,rival:!!sel.rival,chaos:!!sel.chaos})); }catch(e){} }
 function has(a){ return true; }   // every ability is always on — no picker, full power
 
+// ---------- 汉字 mode 学中文 ----------
+// Characters ride on the enemies and boxes the game already has. Stomp one, hear it, collect it.
+// Deck rule: a character earns a slot only if ONE emoji shows its meaning honestly — the player is a
+// total beginner who reads no Chinese and no English, so meaning must arrive as picture + sound.
+const ZI=[
+  {z:'猫',py:'māo',em:'🐱'},  {z:'狗',py:'gǒu',em:'🐶'},  {z:'鱼',py:'yú',em:'🐟'},   {z:'鸟',py:'niǎo',em:'🐦'}, {z:'马',py:'mǎ',em:'🐴'},
+  {z:'牛',py:'niú',em:'🐮'},  {z:'羊',py:'yáng',em:'🐑'}, {z:'猪',py:'zhū',em:'🐷'},  {z:'虫',py:'chóng',em:'🐛'},{z:'龟',py:'guī',em:'🐢'},
+  {z:'山',py:'shān',em:'⛰️'}, {z:'水',py:'shuǐ',em:'💧'}, {z:'火',py:'huǒ',em:'🔥'},  {z:'日',py:'rì',em:'☀️'},   {z:'月',py:'yuè',em:'🌙'},
+  {z:'星',py:'xīng',em:'⭐'}, {z:'雨',py:'yǔ',em:'🌧️'},   {z:'云',py:'yún',em:'☁️'},  {z:'雪',py:'xuě',em:'❄️'},  {z:'花',py:'huā',em:'🌸'},
+  {z:'口',py:'kǒu',em:'👄'},  {z:'手',py:'shǒu',em:'✋'},  {z:'目',py:'mù',em:'👁️'},   {z:'耳',py:'ěr',em:'👂'},   {z:'心',py:'xīn',em:'❤️'},
+  {z:'牙',py:'yá',em:'🦷'},
+  {z:'车',py:'chē',em:'🚗'},  {z:'门',py:'mén',em:'🚪'},  {z:'书',py:'shū',em:'📖'},  {z:'伞',py:'sǎn',em:'☂️'},  {z:'刀',py:'dāo',em:'🔪'},
+  {z:'船',py:'chuán',em:'⛵'},{z:'灯',py:'dēng',em:'💡'}, {z:'鞋',py:'xié',em:'👟'},  {z:'球',py:'qiú',em:'⚽'},
+  {z:'一',py:'yī',em:'1️⃣'},  {z:'二',py:'èr',em:'2️⃣'},   {z:'三',py:'sān',em:'3️⃣'},  {z:'五',py:'wǔ',em:'5️⃣'},  {z:'十',py:'shí',em:'🔟'}
+];
+const ZIFONT='"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif';
+
+let ziOn=true, ziSeen={};
+try{ const zs=JSON.parse(localStorage.getItem('hopZi')||'null'); if(zs){ ziOn=zs.on!==false; ziSeen=zs.seen||{}; } }catch(e){}
+function saveZi(){ try{ localStorage.setItem('hopZi', JSON.stringify({on:ziOn, seen:ziSeen})); }catch(e){} }
+function ziCount(){ let n=0; for(const k in ziSeen) if(ziSeen[k]>0) n++; return n; }
+function ziCollectRecord(zc){ ziSeen[zc]=(ziSeen[zc]||0)+1; saveZi(); }
+
+// shuffled bag — every character shows up once before any repeats, so one level can't
+// hand out 猫 nine times and nothing else
+let ziBag=[];
+function ziDraw(){
+  if(!ziBag.length){
+    ziBag=ZI.map((_,i)=>i);
+    for(let i=ziBag.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; const t=ziBag[i]; ziBag[i]=ziBag[j]; ziBag[j]=t; }
+  }
+  return ziBag.pop();
+}
+// lazy assignment: the first time anything asks for an object's character it gets one.
+// This covers every spawn path at once — level build, custom levels, survival waves, boss
+// arenas, and the mirrored/remixed copies made by object spread.
+function ziOf(o){ if(o.zi==null) o.zi=ziDraw(); return ZI[o.zi]; }
+
+// ---------- 汉字 mode — self-check (open with ?zicheck) ----------
+function ziCheck(){
+  const fail=[], seenZ={};
+  ZI.forEach((z,i)=>{
+    if(!z.z||!z.py||!z.em) fail.push('entry '+i+' is missing z/py/em');
+    if(seenZ[z.z]) fail.push('duplicate character '+z.z);
+    seenZ[z.z]=1;
+  });
+  if(ZI.length!==40) fail.push('deck has '+ZI.length+' entries, expected 40');
+
+  // the bag must emit every character once before any repeat
+  ziBag=[];
+  const got={}; let dup=0;
+  for(let i=0;i<ZI.length;i++){ const k=ziDraw(); if(got[k]) dup++; got[k]=1; }
+  if(dup) fail.push('bag repeated '+dup+' character(s) before exhausting');
+  if(Object.keys(got).length!==ZI.length) fail.push('bag missed '+(ZI.length-Object.keys(got).length)+' character(s)');
+  ziBag=[];
+
+  // recording a sighting increments the right key and survives a round-trip
+  const before=ziSeen['猫']||0;
+  ziCollectRecord('猫');
+  if((ziSeen['猫']||0)!==before+1) fail.push('sighting did not increment 猫');
+  let round=null; try{ round=JSON.parse(localStorage.getItem('hopZi')||'null'); }catch(e){}
+  if(!round||!round.seen||round.seen['猫']!==before+1) fail.push('sighting did not persist to localStorage');
+  ziSeen['猫']=before; if(!before) delete ziSeen['猫']; saveZi();   // leave the real sticker book untouched
+
+  console.log(fail.length ? '❌ zicheck FAILED:\n  '+fail.join('\n  ')
+                          : '✅ zicheck passed — '+ZI.length+' characters, bag + dex OK');
+  return fail;
+}
+try{ if(location.search.indexOf('zicheck')>=0) setTimeout(ziCheck,0); }catch(e){}
 // ---------- levels ----------
 // 22 hand-built worlds, each with its own layout AND art theme.
 let W, H, grid, coins, enemies, spikes, projectiles, boxes, presents, toasts, boss, flag, startPx, curTheme, curName, curLevel=0;
