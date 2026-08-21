@@ -142,6 +142,7 @@
     <button class="chip tab" data-pane="hero">🎨 Hero</button>
     <button class="chip tab" data-pane="shop">🛒 Shop</button>
     <button class="chip tab" data-pane="sound">🔊 Sound</button>
+    <button class="chip tab" data-pane="zi">字 Chinese</button>
   </div>
 
   <div class="card pane" id="pane-levels">
@@ -165,6 +166,11 @@
       <button class="chip" id="musTog">🎵 Music: ON</button>
       <button class="chip" id="sfxTog">🔊 Sound FX: ON</button>
     </div>
+  </div>
+  <div class="card pane hidden" id="pane-zi">
+    <div class="row"><button class="chip" id="ziTog">汉字 Chinese: ON</button></div>
+    <div class="lbl" id="ziCountLbl">0 / 40 collected</div>
+    <div class="row" id="ziGrid"></div>
   </div>
 
   <div class="sub" style="margin-top:8px">Move: ◀ ▶ · Jump: ▲ / Space · <b>🔫 Shoot</b> (F) · <b>💨 Dash</b> (X) · <b>⬇️ Pound</b> (↓) · ✦ throw (Shift) — coins are your bullets!</div>
@@ -2712,6 +2718,21 @@ function lose(){ setTrack(null); bank+=coinsGot; saveBank();
   document.getElementById('nextBtn').style.display='none';
   o.classList.remove('hidden'); }
 
+function updZiUI(){
+  const tg=document.getElementById('ziTog');
+  tg.textContent='汉字 Chinese: '+(ziOn?'ON':'OFF'); tg.classList.toggle('sel',ziOn);
+  document.getElementById('ziCountLbl').textContent=ziCount()+' / '+ZI.length+' collected';
+  const g=document.getElementById('ziGrid'); g.innerHTML='';
+  ZI.forEach(z=>{
+    const n=ziSeen[z.z]||0, d=document.createElement('div');
+    d.className='chip'+(n?' sel':'');
+    d.style.opacity=n?'':'0.4';
+    d.style.fontFamily=ZIFONT;
+    d.textContent = n ? z.z+' '+z.em+' '+z.py+' ×'+n : '？';
+    if(n) d.onclick=()=>ziSay(z.z);
+    g.appendChild(d);
+  });
+}
 function buildMenu(){
   if(menuLevel>=LEVELS.length||menuLevel<0) menuLevel=0;
   const rb=rushBest(); document.getElementById('rushBtn').textContent='👑 BOSS RUSH'+(rb?' · Best '+rb+'/'+LEVELS.length:'');
@@ -2720,6 +2741,7 @@ function buildMenu(){
   document.getElementById('advBtn').textContent='🌈 ADVENTURE · ⭐'+totalStars();
   document.getElementById('questBtn').textContent='🗡️ QUEST · LV '+qs.lv+(qs.deepest?' · deepest F'+qs.deepest:'');
   document.getElementById('bankAmt').textContent=bank;
+  updZiUI();
   document.getElementById('myLvlBtn').style.display=hasCustom()?'':'none';
   const sr=document.getElementById('shopRow'); sr.innerHTML='';
   SHOP.forEach(it=>{ const d=document.createElement('div'); const owned=shopState.owned.includes(it.id);
@@ -2752,6 +2774,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('sel',x===t));
   document.querySelectorAll('.pane').forEach(pn=>pn.classList.toggle('hidden', pn.id!=='pane-'+t.dataset.pane));
 });
+document.getElementById('ziTog').onclick=()=>{ ziOn=!ziOn; saveZi(); updZiUI(); };
 document.getElementById('playBtn').onclick=()=>startGame(menuLevel);
 document.getElementById('nextBtn').onclick=()=>startGame(curLevel+1,advMode);
 document.getElementById('againBtn').onclick=()=>questMode?startQuest():rushMode?startRush():dailyMode?startDaily():customMode?startCustom():survMode?startSurvival():startGame(curLevel,advMode);
