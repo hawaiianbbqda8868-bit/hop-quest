@@ -272,7 +272,13 @@ const ZI=[
   {z:'牙',py:'yá',em:'🦷'},
   {z:'车',py:'chē',em:'🚗'},  {z:'门',py:'mén',em:'🚪'},  {z:'书',py:'shū',em:'📖'},  {z:'伞',py:'sǎn',em:'☂️'},  {z:'刀',py:'dāo',em:'🔪'},
   {z:'船',py:'chuán',em:'⛵'},{z:'灯',py:'dēng',em:'💡'}, {z:'鞋',py:'xié',em:'👟'},  {z:'球',py:'qiú',em:'⚽'},
-  {z:'一',py:'yī',em:'1️⃣'},  {z:'二',py:'èr',em:'2️⃣'},   {z:'三',py:'sān',em:'3️⃣'},  {z:'五',py:'wǔ',em:'5️⃣'},  {z:'十',py:'shí',em:'🔟'}
+  {z:'一',py:'yī',em:'1️⃣'},  {z:'二',py:'èr',em:'2️⃣'},   {z:'三',py:'sān',em:'3️⃣'},  {z:'五',py:'wǔ',em:'5️⃣'},  {z:'十',py:'shí',em:'🔟'},
+  // food 吃的
+  {z:'饭',py:'fàn',em:'🍚'},  {z:'面',py:'miàn',em:'🍜'}, {z:'蛋',py:'dàn',em:'🥚'},  {z:'肉',py:'ròu',em:'🍖'},  {z:'鸡',py:'jī',em:'🐔'},
+  {z:'茶',py:'chá',em:'🍵'},  {z:'奶',py:'nǎi',em:'🥛'},  {z:'糖',py:'táng',em:'🍬'}, {z:'饺',py:'jiǎo',em:'🥟'}, {z:'瓜',py:'guā',em:'🍉'},
+  // family 家人
+  {z:'妈',py:'mā',em:'👩'},   {z:'爸',py:'bà',em:'👨'},   {z:'爷',py:'yé',em:'👴'},   {z:'家',py:'jiā',em:'🏠'},
+  {z:'人',py:'rén',em:'🧍'},  {z:'女',py:'nǚ',em:'👧'},   {z:'男',py:'nán',em:'👦'}
 ];
 const ZIFONT='"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif';
 
@@ -317,8 +323,8 @@ function ziPrime(){
 // The moment of learning: character flies up off the corpse, emoji beside it, voice says it.
 function ziCollect(z, x, y){
   ziCollectRecord(z.z);
-  toasts.push({x:x-18, y, ic:z.z,  zi:true, t:1.5});
-  toasts.push({x:x+24, y, ic:z.em, em:true, t:1.5});   // the emoji IS the meaning — it carries equal weight
+  toasts.push({x:x-18, y, ic:z.z,  zi:true, t:3.2});
+  toasts.push({x:x+24, y, ic:z.em, em:true, t:3.2});   // the emoji IS the meaning — it carries equal weight
   ziSay(z.z);
 }
 function drawZi(o, cx, cy, size){
@@ -327,8 +333,13 @@ function drawZi(o, cx, cy, size){
   ctx.save();
   ctx.font='bold '+size+'px '+ZIFONT;
   ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.lineJoin='round'; ctx.lineWidth=Math.max(3,size*0.24);
-  ctx.strokeStyle='rgba(18,10,34,.92)'; ctx.strokeText(z.z,cx,cy);
+  // a dark plate carries the contrast instead of a thick stroke — a heavy outline
+  // eats the inner strokes of dense characters like 糖 and 饺 at this size
+  const pw=size*1.16, ph=size*1.16;
+  ctx.fillStyle='rgba(18,10,34,.72)';
+  roundRect(cx-pw/2, cy-ph/2, pw, ph, Math.max(3,size*0.2)); ctx.fill();
+  ctx.lineJoin='round'; ctx.lineWidth=Math.max(1.5,size*0.1);
+  ctx.strokeStyle='rgba(18,10,34,.9)'; ctx.strokeText(z.z,cx,cy);
   ctx.fillStyle='#fff'; ctx.fillText(z.z,cx,cy);
   ctx.restore();
 }
@@ -353,7 +364,7 @@ function ziCheck(){
     if(seenZ[z.z]) fail.push('duplicate character '+z.z);
     seenZ[z.z]=1;
   });
-  if(ZI.length!==40) fail.push('deck has '+ZI.length+' entries, expected 40');
+  if(ZI.length<40) fail.push('deck shrank to '+ZI.length+' entries');
 
   // the bag must emit every character once before any repeat
   ziBag=[];
@@ -2340,7 +2351,7 @@ function render(){
     else drawHero(); }
   if(pet) drawPet();
   // pickup toasts (rising icons)
-  for(const t of toasts){ ctx.globalAlpha=Math.max(0,t.t);
+  for(const t of toasts){ ctx.globalAlpha=Math.max(0,Math.min(1,t.t));   // hold opaque, then fade over the last second
     if(t.zi){ ctx.save();
       ctx.font='bold 34px '+ZIFONT; ctx.textAlign='center';
       ctx.lineJoin='round'; ctx.lineWidth=7; ctx.strokeStyle='rgba(18,10,34,.9)'; ctx.strokeText(t.ic,t.x,t.y);
@@ -2842,7 +2853,9 @@ function loop(ts){ let dt=Math.min(0.033,(ts-last)/1000)||0; last=ts;
   update(dt);
   for(let i=pops.length-1;i>=0;i--){ pops[i].t-=dt; if(pops[i].t<=0) pops.splice(i,1); }
   for(let i=shock.length-1;i>=0;i--){ shock[i].t-=dt; if(shock[i].t<=0) shock.splice(i,1); }
-  if(toasts) for(let i=toasts.length-1;i>=0;i--){ toasts[i].t-=dt; toasts[i].y-=28*dt; if(toasts[i].t<=0) toasts.splice(i,1); }
+  if(toasts) for(let i=toasts.length-1;i>=0;i--){ const tt=toasts[i]; tt.t-=dt;
+    tt.y-=(tt.zi||tt.em?11:28)*dt;                 // characters drift gently so they stay readable
+    if(tt.t<=0) toasts.splice(i,1); }
   if(coins) for(let i=coins.length-1;i>=0;i--){ const c=coins[i]; if(c.fall&&c.y>H*TILE+40) coins.splice(i,1); }  // rain coins lost to pits
   for(const pid in mp.players){ if(mp.players[pid].emoteT>0) mp.players[pid].emoteT-=dt; }
   document.getElementById('emoteBar').classList.toggle('hidden', !(mp.active&&(state==='play'||state==='dying')));

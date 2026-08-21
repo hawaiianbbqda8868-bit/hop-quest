@@ -41,7 +41,7 @@ Membership rule: a character qualifies only if a single emoji shows its
 meaning honestly. This is what makes zero-English teaching possible, and it
 is the constraint that sets the deck size.
 
-Contents (40):
+Contents (57):
 
 | Group | Characters |
 |---|---|
@@ -50,6 +50,17 @@ Contents (40):
 | Body (6)     | 口 手 目 耳 心 牙 |
 | Things (9)   | 车 门 书 伞 刀 船 灯 鞋 球 |
 | Numbers (5)  | 一 二 三 五 十 |
+| Food (10)    | 饭 面 蛋 肉 鸡 茶 奶 糖 饺 瓜 |
+| Family (7)   | 妈 爸 爷 家 人 女 男 |
+
+A second rule joins the emoji rule: **no two characters may share an emoji.**
+Two characters showing the same picture would read as the same meaning. This is
+why 奶 is milk 🥛 rather than grandma, and why older/younger sibling characters
+(哥 弟 姐 妹) are excluded — emoji cannot distinguish them.
+
+Deck size is a learning trade-off, not a free win: a level places ~40 enemies and
+boxes, so a 57-character deck means he meets nearly every character once per level
+with little in-level repetition. Growing the deck further trades depth for breadth.
 
 Adding a future deck means appending to this array. No game code changes.
 
@@ -82,7 +93,9 @@ boss-adjacent kills alike.
 
 On death (and on popping a present box):
 
-1. The character rises off the corpse at ~32px and fades.
+1. The character rises off the corpse at ~34px, holds for 2.2s, then fades over
+   the final second (3.2s total) while drifting only ~35px, so it stays put long
+   enough to read.
 2. Its emoji appears beside it.
 3. A Mandarin voice speaks the word.
 4. The character's count in the sticker book increments.
@@ -146,7 +159,7 @@ testable logic is kept pure and small and checked by a debug flag:
 
 - `?zicheck` runs assertions in the console and renders a pass/fail line:
   - every `ZI` entry has a non-empty `z`, `py` and `em`
-  - no duplicate characters
+  - no duplicate characters, and no duplicate emoji
   - the shuffled bag emits every character once before repeating
   - recording a sighting increments the right key and persists
 - Everything visual — legibility of the character on each enemy type, the

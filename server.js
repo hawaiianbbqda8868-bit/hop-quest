@@ -25,7 +25,7 @@ const srv = http.createServer((req, res) => {
     res.end(buf);
   });
 });
-srv.listen(process.env.PORT || 3000, () => console.log('Hop Quest server + family relay up on', process.env.PORT || 3000));
+srv.listen(process.env.PORT || 3001, () => console.log('Hop Quest server + family relay up on', process.env.PORT || 3001));
 
 // ---------- family-room WebSocket relay (RFC 6455, text frames, zero deps) ----------
 // One global room: everyone connects to /ws, gets an id, lowest id is the leader.
