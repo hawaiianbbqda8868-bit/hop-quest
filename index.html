@@ -142,6 +142,7 @@
     <button class="chip tab" data-pane="hero">🎨 Hero</button>
     <button class="chip tab" data-pane="shop">🛒 Shop</button>
     <button class="chip tab" data-pane="sound">🔊 Sound</button>
+    <button class="chip tab" data-pane="zi">字 Chinese</button>
   </div>
 
   <div class="card pane" id="pane-levels">
@@ -165,6 +166,11 @@
       <button class="chip" id="musTog">🎵 Music: ON</button>
       <button class="chip" id="sfxTog">🔊 Sound FX: ON</button>
     </div>
+  </div>
+  <div class="card pane hidden" id="pane-zi">
+    <div class="row"><button class="chip" id="ziTog">汉字 Chinese: ON</button></div>
+    <div class="lbl" id="ziCountLbl">0 / 40 collected</div>
+    <div class="row" id="ziGrid"></div>
   </div>
 
   <div class="sub" style="margin-top:8px">Move: ◀ ▶ · Jump: ▲ / Space · <b>🔫 Shoot</b> (F) · <b>💨 Dash</b> (X) · <b>⬇️ Pound</b> (↓) · ✦ throw (Shift) — coins are your bullets!</div>
@@ -253,6 +259,123 @@ try{ const s=JSON.parse(localStorage.getItem('hopHero')||'null'); if(s){ sel.col
 function saveHero(){ try{ localStorage.setItem('hopHero', JSON.stringify({color:sel.color,hat:sel.hat,abil:[...sel.abil],level:menuLevel,remix:!!sel.remix,rival:!!sel.rival,chaos:!!sel.chaos})); }catch(e){} }
 function has(a){ return true; }   // every ability is always on — no picker, full power
 
+// ---------- 汉字 mode 学中文 ----------
+// Characters ride on the enemies and boxes the game already has. Stomp one, hear it, collect it.
+// Deck rule: a character earns a slot only if ONE emoji shows its meaning honestly — the player is a
+// total beginner who reads no Chinese and no English, so meaning must arrive as picture + sound.
+const ZI=[
+  {z:'猫',py:'māo',em:'🐱'},  {z:'狗',py:'gǒu',em:'🐶'},  {z:'鱼',py:'yú',em:'🐟'},   {z:'鸟',py:'niǎo',em:'🐦'}, {z:'马',py:'mǎ',em:'🐴'},
+  {z:'牛',py:'niú',em:'🐮'},  {z:'羊',py:'yáng',em:'🐑'}, {z:'猪',py:'zhū',em:'🐷'},  {z:'虫',py:'chóng',em:'🐛'},{z:'龟',py:'guī',em:'🐢'},
+  {z:'山',py:'shān',em:'⛰️'}, {z:'水',py:'shuǐ',em:'💧'}, {z:'火',py:'huǒ',em:'🔥'},  {z:'日',py:'rì',em:'☀️'},   {z:'月',py:'yuè',em:'🌙'},
+  {z:'星',py:'xīng',em:'⭐'}, {z:'雨',py:'yǔ',em:'🌧️'},   {z:'云',py:'yún',em:'☁️'},  {z:'雪',py:'xuě',em:'❄️'},  {z:'花',py:'huā',em:'🌸'},
+  {z:'口',py:'kǒu',em:'👄'},  {z:'手',py:'shǒu',em:'✋'},  {z:'目',py:'mù',em:'👁️'},   {z:'耳',py:'ěr',em:'👂'},   {z:'心',py:'xīn',em:'❤️'},
+  {z:'牙',py:'yá',em:'🦷'},
+  {z:'车',py:'chē',em:'🚗'},  {z:'门',py:'mén',em:'🚪'},  {z:'书',py:'shū',em:'📖'},  {z:'伞',py:'sǎn',em:'☂️'},  {z:'刀',py:'dāo',em:'🔪'},
+  {z:'船',py:'chuán',em:'⛵'},{z:'灯',py:'dēng',em:'💡'}, {z:'鞋',py:'xié',em:'👟'},  {z:'球',py:'qiú',em:'⚽'},
+  {z:'一',py:'yī',em:'1️⃣'},  {z:'二',py:'èr',em:'2️⃣'},   {z:'三',py:'sān',em:'3️⃣'},  {z:'五',py:'wǔ',em:'5️⃣'},  {z:'十',py:'shí',em:'🔟'}
+];
+const ZIFONT='"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif';
+
+let ziOn=true, ziSeen={};
+try{ const zs=JSON.parse(localStorage.getItem('hopZi')||'null'); if(zs){ ziOn=zs.on!==false; ziSeen=zs.seen||{}; } }catch(e){}
+function saveZi(){ try{ localStorage.setItem('hopZi', JSON.stringify({on:ziOn, seen:ziSeen})); }catch(e){} }
+function ziCount(){ let n=0; for(const k in ziSeen) if(ziSeen[k]>0) n++; return n; }
+function ziCollectRecord(zc){ ziSeen[zc]=(ziSeen[zc]||0)+1; saveZi(); }
+
+// shuffled bag — every character shows up once before any repeats, so one level can't
+// hand out 猫 nine times and nothing else
+let ziBag=[];
+function ziDraw(){
+  if(!ziBag.length){
+    ziBag=ZI.map((_,i)=>i);
+    for(let i=ziBag.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; const t=ziBag[i]; ziBag[i]=ziBag[j]; ziBag[j]=t; }
+  }
+  return ziBag.pop();
+}
+// lazy assignment: the first time anything asks for an object's character it gets one.
+// This covers every spawn path at once — level build, custom levels, survival waves, boss
+// arenas, and the mirrored/remixed copies made by object spread.
+function ziOf(o){ if(o.zi==null) o.zi=ziDraw(); return ZI[o.zi]; }
+
+// Web Speech API. Three guards: primed on first gesture (iOS refuses otherwise),
+// cancel() before each word so chain-stomps don't queue up ten of them, and a silent
+// skip when the device has no Chinese voice — the visual pop still happens.
+function ziVoice(){
+  try{ const vs=speechSynthesis.getVoices()||[];
+    const zh=vs.filter(x=>/^zh/i.test(x.lang) && !/^zh-HK/i.test(x.lang));   // zh-HK is Cantonese — wrong pronunciation to learn
+    return {list:vs, v:zh.find(x=>/^zh-CN/i.test(x.lang)) || zh[0] || null}; }
+  catch(e){ return {list:[], v:null}; }
+}
+function ziPrime(){
+  try{ if(!window.speechSynthesis) return;
+    speechSynthesis.getVoices();
+    const u=new SpeechSynthesisUtterance(''); u.lang='zh-CN'; u.volume=0; speechSynthesis.speak(u);
+  }catch(e){}
+}
+// White fill + heavy dark outline so the character reads against every body colour —
+// walker purple, brute brown, spiker slate, chaser red, flyer pink, box lids.
+// The moment of learning: character flies up off the corpse, emoji beside it, voice says it.
+function ziCollect(z, x, y){
+  ziCollectRecord(z.z);
+  toasts.push({x:x-18, y, ic:z.z,  zi:true, t:1.5});
+  toasts.push({x:x+24, y, ic:z.em, em:true, t:1.5});   // the emoji IS the meaning — it carries equal weight
+  ziSay(z.z);
+}
+function drawZi(o, cx, cy, size){
+  if(!ziOn) return;
+  const z=ziOf(o);
+  ctx.save();
+  ctx.font='bold '+size+'px '+ZIFONT;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.lineJoin='round'; ctx.lineWidth=Math.max(3,size*0.24);
+  ctx.strokeStyle='rgba(18,10,34,.92)'; ctx.strokeText(z.z,cx,cy);
+  ctx.fillStyle='#fff'; ctx.fillText(z.z,cx,cy);
+  ctx.restore();
+}
+function ziSay(z){
+  if(!sfxOn||!window.speechSynthesis) return;
+  try{
+    const vv=ziVoice();
+    if(vv.list.length && !vv.v) return;      // voices loaded but none is Chinese — stay silent
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(z);
+    u.lang='zh-CN'; u.rate=0.8;              // slow enough for a beginner to catch the tone
+    if(vv.v) u.voice=vv.v;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+// ---------- 汉字 mode — self-check (open with ?zicheck) ----------
+function ziCheck(){
+  const fail=[], seenZ={};
+  ZI.forEach((z,i)=>{
+    if(!z.z||!z.py||!z.em) fail.push('entry '+i+' is missing z/py/em');
+    if(seenZ[z.z]) fail.push('duplicate character '+z.z);
+    seenZ[z.z]=1;
+  });
+  if(ZI.length!==40) fail.push('deck has '+ZI.length+' entries, expected 40');
+
+  // the bag must emit every character once before any repeat
+  ziBag=[];
+  const got={}; let dup=0;
+  for(let i=0;i<ZI.length;i++){ const k=ziDraw(); if(got[k]) dup++; got[k]=1; }
+  if(dup) fail.push('bag repeated '+dup+' character(s) before exhausting');
+  if(Object.keys(got).length!==ZI.length) fail.push('bag missed '+(ZI.length-Object.keys(got).length)+' character(s)');
+  ziBag=[];
+
+  // recording a sighting increments the right key and survives a round-trip
+  const before=ziSeen['猫']||0;
+  ziCollectRecord('猫');
+  if((ziSeen['猫']||0)!==before+1) fail.push('sighting did not increment 猫');
+  let round=null; try{ round=JSON.parse(localStorage.getItem('hopZi')||'null'); }catch(e){}
+  if(!round||!round.seen||round.seen['猫']!==before+1) fail.push('sighting did not persist to localStorage');
+  ziSeen['猫']=before; if(!before) delete ziSeen['猫']; saveZi();   // leave the real sticker book untouched
+
+  console.log(fail.length ? '❌ zicheck FAILED:\n  '+fail.join('\n  ')
+                          : '✅ zicheck passed — '+ZI.length+' characters, bag + dex OK');
+  return fail;
+}
+try{ if(location.search.indexOf('zicheck')>=0) setTimeout(ziCheck,0); }catch(e){}
 // ---------- levels ----------
 // 22 hand-built worlds, each with its own layout AND art theme.
 let W, H, grid, coins, enemies, spikes, projectiles, boxes, presents, toasts, boss, flag, startPx, curTheme, curName, curLevel=0;
@@ -420,7 +543,9 @@ function hurtEnemy(en,dmg,daze){
   if(en.hp>0){ en.flash=0.22; en.kb=0.09; addPop(en.x+en.w/2,en.y+6); sfx('bosshit');
     if(daze) en.daze=Math.max(en.daze||0,daze);      // staggered where it stands so you can hit it again
     return false; }
-  en.alive=false; addPop(en.x+en.w/2,en.y); sfx('stomp'); dropLoot(en); spawnShell(en); return true;
+  en.alive=false; addPop(en.x+en.w/2,en.y); sfx('stomp'); dropLoot(en); spawnShell(en);
+  if(ziOn) ziCollect(ziOf(en), en.x+en.w/2, en.y-6);   // one hook covers stomps, pounds, blaster, shells
+  return true;
 }
 function spawnShell(en){ shells.push({x:en.x+en.w/2-15, y:en.y+en.h-12, w:30, h:12, t:6,
   col:en.type==='chase'?'#d0603b':en.type==='jump'?'#3ba05c':en.type==='shoot'?'#6a7078':en.type==='fly'?'#e06fb0':'#8a5cd0'}); }
@@ -1695,6 +1820,7 @@ function update(dt){
   for(const bx of boxes){ if(bx.open) continue;
     if((pl.vy>0||pl.pounding) && rectHit(pl,bx) && (pl.y+pl.h)-bx.y<22){
       bx.open=true; if(!pl.pounding) pl.vy=-460; sfx('box'); addPop(bx.x+bx.w/2,bx.y);
+      if(ziOn) ziCollect(ziOf(bx), bx.x+bx.w/2, bx.y-10);   // powerup below is untouched
       const r=Math.random(), type=r<.18?'heart':r<.34?'shield':r<.5?'grow':r<.64?'stars':r<.76?'drill':r<.88?'bubble':'jet';
       presents.push({x:bx.x+bx.w/2, y:bx.y-26, type, t:0, got:false});
     }
@@ -1991,7 +2117,7 @@ function runMusic(){ if(!musicOn||!curTrack||!ensureCtx()) return;
 function stopMusic(){ if(mus.timer){ clearInterval(mus.timer); mus.timer=null; } }
 function setTrack(name){ if(name===curTrack&&mus.timer) return; curTrack=name; stopMusic(); if(name) runMusic(); }
 // browsers only allow audio after a user gesture — retry on any input
-addEventListener('pointerdown',()=>runMusic(),true);
+addEventListener('pointerdown',()=>{ runMusic(); ziPrime(); },true);
 addEventListener('keydown',()=>runMusic(),true);
 document.addEventListener('visibilitychange',()=>{ if(document.hidden) stopMusic(); else runMusic(); });
 
@@ -2214,7 +2340,14 @@ function render(){
     else drawHero(); }
   if(pet) drawPet();
   // pickup toasts (rising icons)
-  for(const t of toasts){ ctx.globalAlpha=Math.max(0,t.t); ctx.fillText(t.ic,t.x,t.y); }
+  for(const t of toasts){ ctx.globalAlpha=Math.max(0,t.t);
+    if(t.zi){ ctx.save();
+      ctx.font='bold 34px '+ZIFONT; ctx.textAlign='center';
+      ctx.lineJoin='round'; ctx.lineWidth=7; ctx.strokeStyle='rgba(18,10,34,.9)'; ctx.strokeText(t.ic,t.x,t.y);
+      ctx.fillStyle='#fff'; ctx.fillText(t.ic,t.x,t.y);
+      ctx.restore(); }
+    else if(t.em){ ctx.save(); ctx.font='30px sans-serif'; ctx.textAlign='center'; ctx.fillText(t.ic,t.x,t.y); ctx.restore(); }
+    else ctx.fillText(t.ic,t.x,t.y); }
   ctx.globalAlpha=1;
   ctx.restore();
   // themed weather / ambience (screen space, parallax wrap)
@@ -2288,6 +2421,7 @@ function drawBox(bx){ const x=bx.x, y=bx.y, w=bx.w, h=bx.h;
     ctx.fillStyle=col; ctx.fillRect(x-3,y,w+6,10);
     ctx.fillStyle='rgba(0,0,0,.15)'; ctx.fillRect(x-3,y+8,w+6,3);
     ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(x+w/2-6,y-2,5,0,7); ctx.arc(x+w/2+6,y-2,5,0,7); ctx.fill();
+    drawZi(bx, x+w/2, y+22, 20);
   } else { // opened, lid off
     ctx.fillStyle='rgba(0,0,0,.25)'; roundRect(x+2,y+16,w-4,h-16,4); ctx.fill();
     ctx.fillStyle=col; roundRect(x,y+14,w,h-14,4); ctx.fill();
@@ -2305,8 +2439,8 @@ function drawEnemy(en){ const et=en.type||'walk';
     const n=en.maxhp, left=Math.max(0,en.hp);
     for(let k=0;k<n;k++){ ctx.fillStyle=k<left?'#ff5a7a':'rgba(255,255,255,.25)';
       ctx.fillRect(en.x+en.w/2-(n*5)/2+k*5, en.y-(en.elite?18:5), 4, 3); } }
-  if(et==='fly') return drawFlyer(en);
-  if(et==='shoot') return drawShooter(en);
+  if(et==='fly'){ drawFlyer(en); drawZi(en,en.x+en.w/2,en.y+en.h/2+1,16); return; }
+  if(et==='shoot'){ drawShooter(en); drawZi(en,en.x+en.w/2,en.y+en.h/2+8,15); return; }   // below the gun barrel
   const cx=en.x+en.w/2, cy=en.y+en.h/2, wob=Math.sin(performance.now()/120+en.x)*2;
   ctx.fillStyle='rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(cx,en.y+en.h,en.w*0.5,4,0,0,7); ctx.fill();
   const body = et==='chase' ? (en.chasing?'#ef4a3a':'#d0603b') : et==='jump' ? '#3ba05c'
@@ -2328,10 +2462,11 @@ function drawEnemy(en){ const et=en.type||'walk';
   if(et==='chase'){ // angry brows + frown
     ctx.strokeStyle='#5a1010'; ctx.lineWidth=2;
     ctx.beginPath(); ctx.moveTo(cx-10,cy-8); ctx.lineTo(cx-3,cy-5); ctx.moveTo(cx+10,cy-8); ctx.lineTo(cx+3,cy-5); ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx,cy+9,3,1.15*Math.PI,1.85*Math.PI); ctx.stroke();
-  } else {
+    if(!ziOn){ ctx.beginPath(); ctx.arc(cx,cy+9,3,1.15*Math.PI,1.85*Math.PI); ctx.stroke(); }
+  } else if(!ziOn) {
     ctx.strokeStyle=et==='jump'?'#1f5c34':'#3a1f5c'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy+6,3,0.15*Math.PI,0.85*Math.PI); ctx.stroke();
   }
+  drawZi(en,cx,cy+8,en.w>34?20:17);   // sits where the mouth was — under the eyes, on the widest part of the body
 }
 function drawFlyer(en){ const cx=en.x+en.w/2, cy=en.y+en.h/2, f=Math.abs(Math.sin(performance.now()/70))*5;
   ctx.fillStyle='rgba(0,0,0,.12)'; ctx.beginPath(); ctx.ellipse(cx,en.baseY+en.h+26,en.w*0.4,3,0,0,7); ctx.fill();
@@ -2583,6 +2718,21 @@ function lose(){ setTrack(null); bank+=coinsGot; saveBank();
   document.getElementById('nextBtn').style.display='none';
   o.classList.remove('hidden'); }
 
+function updZiUI(){
+  const tg=document.getElementById('ziTog');
+  tg.textContent='汉字 Chinese: '+(ziOn?'ON':'OFF'); tg.classList.toggle('sel',ziOn);
+  document.getElementById('ziCountLbl').textContent=ziCount()+' / '+ZI.length+' collected';
+  const g=document.getElementById('ziGrid'); g.innerHTML='';
+  ZI.forEach(z=>{
+    const n=ziSeen[z.z]||0, d=document.createElement('div');
+    d.className='chip'+(n?' sel':'');
+    d.style.opacity=n?'':'0.4';
+    d.style.fontFamily=ZIFONT;
+    d.textContent = n ? z.z+' '+z.em+' '+z.py+' ×'+n : '？';
+    if(n) d.onclick=()=>ziSay(z.z);
+    g.appendChild(d);
+  });
+}
 function buildMenu(){
   if(menuLevel>=LEVELS.length||menuLevel<0) menuLevel=0;
   const rb=rushBest(); document.getElementById('rushBtn').textContent='👑 BOSS RUSH'+(rb?' · Best '+rb+'/'+LEVELS.length:'');
@@ -2591,6 +2741,7 @@ function buildMenu(){
   document.getElementById('advBtn').textContent='🌈 ADVENTURE · ⭐'+totalStars();
   document.getElementById('questBtn').textContent='🗡️ QUEST · LV '+qs.lv+(qs.deepest?' · deepest F'+qs.deepest:'');
   document.getElementById('bankAmt').textContent=bank;
+  updZiUI();
   document.getElementById('myLvlBtn').style.display=hasCustom()?'':'none';
   const sr=document.getElementById('shopRow'); sr.innerHTML='';
   SHOP.forEach(it=>{ const d=document.createElement('div'); const owned=shopState.owned.includes(it.id);
@@ -2623,6 +2774,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('sel',x===t));
   document.querySelectorAll('.pane').forEach(pn=>pn.classList.toggle('hidden', pn.id!=='pane-'+t.dataset.pane));
 });
+document.getElementById('ziTog').onclick=()=>{ ziOn=!ziOn; saveZi(); updZiUI(); };
 document.getElementById('playBtn').onclick=()=>startGame(menuLevel);
 document.getElementById('nextBtn').onclick=()=>startGame(curLevel+1,advMode);
 document.getElementById('againBtn').onclick=()=>questMode?startQuest():rushMode?startRush():dailyMode?startDaily():customMode?startCustom():survMode?startSurvival():startGame(curLevel,advMode);
