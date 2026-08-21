@@ -244,15 +244,38 @@ Replace with:
 
 ```js
   if(et==='fly'){ drawFlyer(en); drawZi(en,en.x+en.w/2,en.y+en.h/2+1,16); return; }
-  if(et==='shoot'){ drawShooter(en); drawZi(en,en.x+en.w/2,en.y+en.h/2+7,16); return; }
+  if(et==='shoot'){ drawShooter(en); drawZi(en,en.x+en.w/2,en.y+en.h/2+8,15); return; }   // below the gun barrel
 ```
 
 - [ ] **Step 3: Paint the ground enemies**
 
-At the very end of `drawEnemy`, after the last drawing statement and before the closing `}` of the function, add:
+The character goes where the mouth is, so the monster reads as *saying* it. That means the
+mouth arc must step aside — but the chaser's angry brows stay, since they are what marks it
+as a chaser. `drawEnemy` currently ends (`index.html:2328-2334`):
 
 ```js
-  drawZi(en,cx,cy+7,en.w>34?21:18);   // on the belly — the widest part of the dome, clear of the eyes
+  if(et==='chase'){ // angry brows + frown
+    ctx.strokeStyle='#5a1010'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(cx-10,cy-8); ctx.lineTo(cx-3,cy-5); ctx.moveTo(cx+10,cy-8); ctx.lineTo(cx+3,cy-5); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx,cy+9,3,1.15*Math.PI,1.85*Math.PI); ctx.stroke();
+  } else {
+    ctx.strokeStyle=et==='jump'?'#1f5c34':'#3a1f5c'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy+6,3,0.15*Math.PI,0.85*Math.PI); ctx.stroke();
+  }
+}
+```
+
+Replace those lines with:
+
+```js
+  if(et==='chase'){ // angry brows + frown
+    ctx.strokeStyle='#5a1010'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(cx-10,cy-8); ctx.lineTo(cx-3,cy-5); ctx.moveTo(cx+10,cy-8); ctx.lineTo(cx+3,cy-5); ctx.stroke();
+    if(!ziOn){ ctx.beginPath(); ctx.arc(cx,cy+9,3,1.15*Math.PI,1.85*Math.PI); ctx.stroke(); }
+  } else if(!ziOn) {
+    ctx.strokeStyle=et==='jump'?'#1f5c34':'#3a1f5c'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy+6,3,0.15*Math.PI,0.85*Math.PI); ctx.stroke();
+  }
+  drawZi(en,cx,cy+8,en.w>34?20:17);   // sits where the mouth was — under the eyes, on the widest part of the body
+}
 ```
 
 - [ ] **Step 4: Paint the present box lids**
@@ -274,6 +297,7 @@ Add immediately after it, still inside the `if(!bx.open){` branch:
 Open `http://localhost:3001/`, press FREE PLAY, and play the first level. Confirm:
 - every walker, jumper, chaser, spiker, brute, flyer and shooter wears a character
 - the character is legible on all of them (white on dark outline)
+- the character sits under the eyes and the mouth arc has stepped aside
 - present boxes wear one on the lid
 - characters do not cover the enemies' eyes
 - nothing else about movement or difficulty changed
